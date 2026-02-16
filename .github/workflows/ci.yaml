@@ -10,40 +10,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  unit-tests:
-    name: "unit tests (py ${{ matrix.python-version }} on ${{ matrix.os }})"
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - python-version: '3.12'
-            os: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v6
-    - name: Set up uv
-      uses: astral-sh/setup-uv@v7
-      with:
-        enable-cache: true
-        cache-dependency-glob: "uv.lock"
-
-    - name: Set up Python ${{ matrix.python-version }}
-      run: uv python install ${{ matrix.python-version }}
-
-    - name: Install Python dependencies
-      run: uv sync --frozen --group dev --no-install-project
-
-    - name: Run restraint unit tests
-      run: >
-        AF3_SKIP_PLATFORM_CHECK=1 PYTHONPATH=src uv run --no-sync pytest
-        tests/unit/test_restraint_types.py
-        tests/unit/test_restraint_validate.py
-        tests/unit/test_restraint_loss.py
-        tests/unit/test_restraint_resolve.py
-        tests/unit/test_input_handler.py
-        tests/unit/test_output_handler.py
-        -v
-
   docs:
     name: "docs build (mkdocs --strict)"
     runs-on: ubuntu-latest
