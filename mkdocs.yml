@@ -1,5 +1,9 @@
-site_name: AlphaFold3 Mac Port
-site_description: macOS/MLX user docs for setup, running, troubleshooting.
+site_name: AlphaFold 3 for Mac
+site_url: https://omrikais.github.io/alphafold3-mac/
+site_description: >-
+  Run AlphaFold 3 protein structure prediction natively on Apple Silicon Macs.
+  MLX inference, web UI, CLI, and restraint-guided docking.
+site_author: Omri Kaisari
 repo_url: https://github.com/omrikais/alphafold3-mac
 repo_name: omrikais/alphafold3-mac
 docs_dir: docs

@@ -68,17 +68,9 @@ PYTHONPATH=src python3 run_alphafold_mlx.py \
 
 ## Documentation
 
-All documentation lives in the [`docs/`](docs/) directory as plain Markdown,
-readable directly on GitHub or in any text editor.
-
-For a searchable local site with navigation, you can optionally serve it
-with MkDocs:
-
-```bash
-source .venv/bin/activate
-uv sync --group docs
-uv run mkdocs serve     # http://127.0.0.1:8000
-```
+Browse the full documentation at
+**[omrikais.github.io/alphafold3-mac](https://omrikais.github.io/alphafold3-mac/)**,
+or read the Markdown sources directly in the [`docs/`](docs/) directory.
 
 Key pages:
 
