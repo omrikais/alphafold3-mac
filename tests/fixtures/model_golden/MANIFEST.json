@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "description": "Model golden reference outputs for numerical parity validation",
+  "platform": "Darwin",
+  "python_version": "3.12.12 (main, Oct  9 2025, 11:07:00) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "generated_at": "2026-02-03T12:46:10.853645",
+  "files": {
+    "pairformer_block_reference.npz": {
+      "description": "Single PairFormer block forward pass",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    },
+    "evoformer_stack_reference.npz": {
+      "description": "Evoformer stack (4 layers) forward pass",
+      "tolerances": {
+        "rtol": 0.001,
+        "atol": 0.0001
+      }
+    },
+    "diffusion_step_reference.npz": {
+      "description": "Single diffusion denoising step",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    },
+    "confidence_head_reference.npz": {
+      "description": "Confidence head forward pass",
+      "tolerances": {
+        "relative_error": 0.01
+      }
+    },
+    "end_to_end_reference.npz": {
+      "description": "Full model end-to-end inference",
+      "tolerances": {
+        "rmsd": 0.5
+      }
+    }
+  },
+  "regeneration_command": "python scripts/generate_model_reference_outputs.py --output tests/fixtures/model_golden/"
+}

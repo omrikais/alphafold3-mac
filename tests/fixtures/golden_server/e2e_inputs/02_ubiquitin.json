@@ -1,0 +1,16 @@
+{
+  "name": "golden_02_ubiquitin_1UBQ",
+  "modelSeeds": [
+    42
+  ],
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG"
+      }
+    }
+  ],
+  "dialect": "alphafold3",
+  "version": 2
+}

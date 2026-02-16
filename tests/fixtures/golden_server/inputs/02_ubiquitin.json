@@ -1,0 +1,17 @@
+[
+  {
+    "name": "golden_02_ubiquitin_1UBQ",
+    "modelSeeds": ["42"],
+    "sequences": [
+      {
+        "proteinChain": {
+          "sequence": "MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG",
+          "count": 1,
+          "maxTemplateDate": "2025-01-01"
+        }
+      }
+    ],
+    "dialect": "alphafoldserver",
+    "version": 1
+  }
+]

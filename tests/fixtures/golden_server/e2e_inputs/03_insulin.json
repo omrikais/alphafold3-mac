@@ -1,0 +1,22 @@
+{
+  "name": "golden_03_insulin_3I40",
+  "modelSeeds": [
+    42
+  ],
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "GIVEQCCTSICSLYQLENYCN"
+      }
+    },
+    {
+      "protein": {
+        "id": "B",
+        "sequence": "FVNQHLCGSHLVEALYLVCGERGFFYTPKT"
+      }
+    }
+  ],
+  "dialect": "alphafold3",
+  "version": 2
+}

@@ -1,0 +1,29 @@
+{
+  "name": "golden_05_calmodulin_calcium_1CLL",
+  "modelSeeds": [
+    42
+  ],
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "MADQLTEEQIAEFKEAFSLFDKDGDGTITTKELGTVMRSLGQNPTEAELQDMINEVDADGNGTIDFPEFLTMMARKMKDTDSEEEIREAFRVFDKDGNGYISAAELRHVMTNLGEKLTDEEVDEMIREADIDGDGQVNYEEFVQMMTAK"
+      }
+    },
+    {
+      "ligand": {
+        "id": [
+          "B",
+          "C",
+          "D",
+          "E"
+        ],
+        "ccdCodes": [
+          "CA"
+        ]
+      }
+    }
+  ],
+  "dialect": "alphafold3",
+  "version": 2
+}

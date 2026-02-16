@@ -1,0 +1,17 @@
+[
+  {
+    "name": "golden_06_desi1_homodimer_2WP7",
+    "modelSeeds": ["42"],
+    "sequences": [
+      {
+        "proteinChain": {
+          "sequence": "MEPPNLYPVKLYVYDLSKGLARRLSPIMLGKQLEGIWHTSIVVHKDEFFFGSGGISSCPPGGTLLGPPDSVVDVGSTEVTEEIFLEYLSSLGESLFRGEAYNLFEHNCNTFSNEVAQFLTGRKIPSYITDLPSEVLSTPFGQALRPLLDSIQIQPPGGSSVGRPNGQS",
+          "count": 2,
+          "maxTemplateDate": "2025-01-01"
+        }
+      }
+    ],
+    "dialect": "alphafoldserver",
+    "version": 1
+  }
+]

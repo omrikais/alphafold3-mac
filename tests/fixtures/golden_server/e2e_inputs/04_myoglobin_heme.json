@@ -1,0 +1,32 @@
+{
+  "name": "golden_04_myoglobin_heme_1MBN",
+  "modelSeeds": [
+    42
+  ],
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "VLSEGEWQLVLHVWAKVEADVAGHGQDILIRLFKSHPETLEKFDRVKHLKTEAEMKASEDLKKHGVTVLTALGAILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSRHPGNFGADAQGAMNKALELFRKDIAAKYKELGYQG"
+      }
+    },
+    {
+      "ligand": {
+        "id": "B",
+        "ccdCodes": [
+          "HEM"
+        ]
+      }
+    },
+    {
+      "ligand": {
+        "id": "C",
+        "ccdCodes": [
+          "FE"
+        ]
+      }
+    }
+  ],
+  "dialect": "alphafold3",
+  "version": 2
+}

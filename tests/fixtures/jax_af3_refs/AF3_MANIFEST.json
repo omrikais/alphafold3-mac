@@ -1,0 +1,101 @@
+{
+  "version": "5.0.0",
+  "description": "JAX AF3 reference outputs for model validation",
+  "generated_at": "2026-02-04T08:37:55.197951",
+  "platform": "Darwin",
+  "python_version": "3.12.12 (main, Oct  9 2025, 11:07:00) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "jax_version": "0.8.1",
+  "seed": 42,
+  "config": {
+    "num_pairformer_layers": 2,
+    "seq_channel": 384,
+    "pair_channel": 128,
+    "msa_channel": 64,
+    "num_residues": 16,
+    "num_msa": 1,
+    "num_templates": 0,
+    "num_atoms_per_token": 32,
+    "num_heads": 4,
+    "diffusion_steps": 5,
+    "diffusion_num_samples": 1,
+    "num_recycles": 0,
+    "atom_cross_att_queries_subset_size": 32,
+    "atom_cross_att_keys_subset_size": 128
+  },
+  "tolerances": {
+    "pairformer": {
+      "rtol": 0.0001,
+      "atol": 1e-05
+    },
+    "evoformer": {
+      "rtol": 0.0001,
+      "atol": 1e-05
+    },
+    "diffusion_step": {
+      "rtol": 0.0001,
+      "atol": 1e-05
+    },
+    "confidence": {
+      "relative_error": 0.01
+    },
+    "end_to_end": {
+      "rmsd_angstrom": 0.5
+    }
+  },
+  "tokamax_stub_used": true,
+  "files": {
+    "pairformer_ref.npz": {
+      "uses_actual_af3_module": true,
+      "includes_params": true,
+      "generated": true,
+      "note": "Uses ACTUAL AF3 PairFormerIteration via hk.transform"
+    },
+    "evoformer_ref.npz": {
+      "uses_actual_af3_module": true,
+      "includes_params": true,
+      "generated": true,
+      "note": "Uses ACTUAL AF3 Evoformer via hk.transform"
+    },
+    "diffusion_step_ref.npz": {
+      "uses_actual_af3_module": true,
+      "includes_params": true,
+      "generated": true,
+      "note": "Uses ACTUAL AF3 DiffusionHead via hk.transform"
+    },
+    "confidence_ref.npz": {
+      "uses_actual_af3_module": true,
+      "includes_params": true,
+      "generated": true,
+      "note": "Uses ACTUAL AF3 ConfidenceHead via hk.transform"
+    },
+    "end_to_end_ref.npz": {
+      "uses_actual_af3_module": true,
+      "includes_params": true,
+      "generated": true,
+      "note": "Uses ACTUAL AF3 Model via hk.transform"
+    }
+  },
+  "compliance": {
+    "pairformer_uses_real_af3": true,
+    "evoformer_uses_real_af3": true,
+    "diffusion_uses_real_af3": true,
+    "confidence_uses_real_af3": true,
+    "end_to_end_uses_real_af3": true,
+    "uses_haiku_transform": true,
+    "all_files_include_params": true,
+    "pairformer_validated": true,
+    "evoformer_validated": true,
+    "diffusion_validated": true,
+    "confidence_validated": true,
+    "end_to_end_validated": true
+  },
+  "notes": [
+    "PairFormer: Use ACTUAL AF3 PairFormerIteration from modules.py",
+    "Evoformer: Uses ACTUAL AF3 Evoformer from evoformer.py",
+    "Diffusion/Confidence/E2E: Use ACTUAL AF3 modules via hk.transform",
+    "Batch inputs constructed via feat_batch.Batch with nested dataclasses",
+    "tokamax stub provides pure JAX implementations when GPU unavailable",
+    "All params saved with params/... keys for MLX weight loading",
+    "References are real AF3 outputs for numerical parity validation"
+  ]
+}

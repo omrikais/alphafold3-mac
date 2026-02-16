@@ -1,0 +1,17 @@
+[
+  {
+    "name": "golden_01_trp_cage_1L2Y",
+    "modelSeeds": ["42"],
+    "sequences": [
+      {
+        "proteinChain": {
+          "sequence": "NLYIQWLKDGGPSSGRPPPS",
+          "count": 1,
+          "maxTemplateDate": "2025-01-01"
+        }
+      }
+    ],
+    "dialect": "alphafoldserver",
+    "version": 1
+  }
+]

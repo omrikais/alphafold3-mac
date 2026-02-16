@@ -1,0 +1,40 @@
+{
+  "version": "1.0.0",
+  "description": "JAX CPU reference outputs for model validation",
+  "platform": "Darwin",
+  "python_version": "3.12.12 (main, Oct  9 2025, 11:07:00) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "jax_version": "0.8.1",
+  "generated_at": "2026-02-03T13:12:30.364138",
+  "files": {
+    "jax_attention_reference.npz": {
+      "description": "Scaled dot-product attention",
+      "tolerances": {
+        "rtol": 1e-05,
+        "atol": 1e-06
+      }
+    },
+    "jax_pairformer_ops_reference.npz": {
+      "description": "PairFormer primitive operations",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    },
+    "jax_diffusion_step_reference.npz": {
+      "description": "Diffusion denoising step primitives",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    },
+    "jax_confidence_ops_reference.npz": {
+      "description": "Confidence head operations",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    }
+  },
+  "regeneration_command": "python scripts/generate_jax_model_references.py --output tests/fixtures/model_golden/",
+  "note": "Run on Linux via Docker for canonical JAX CPU references"
+}

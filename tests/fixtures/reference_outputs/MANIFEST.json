@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "description": "Linux reference outputs for cross-platform parity validation",
+  "platform": "Linux",
+  "python_version": "3.12.12 (GCC 12.2.0)",
+  "generator": "scripts/generate_reference_outputs.py",
+  "docker_image": "alphafold3-reference (built from docker/Dockerfile.reference)",
+  "docker_base": "python:3.12-slim-bookworm",
+  "generated_at": "2026-02-02",
+  "notes": "Regenerate using Docker to ensure platform=Linux metadata. Includes full MSA search pipeline.",
+  "files": {
+    "fasta_parsing_reference.npz": {
+      "description": "FASTA parsing outputs",
+      "cpp_module": "fasta_iterator",
+      "functions_tested": ["parse_fasta", "parse_fasta_include_descriptions"]
+    },
+    "msa_profile_reference.npz": {
+      "description": "MSA profile computation",
+      "cpp_module": "msa_profile",
+      "functions_tested": ["compute_msa_profile"],
+      "deterministic_seed": 42
+    },
+    "string_array_reference.npz": {
+      "description": "String array operations",
+      "cpp_module": "string_array",
+      "functions_tested": ["isin", "remap"]
+    },
+    "msa_featurization_reference.npz": {
+      "description": "MSA featurization with synthetic A3M (no databases)",
+      "python_modules": ["alphafold3.data.msa", "alphafold3.data.msa_features"],
+      "functions_tested": ["Msa.from_a3m", "Msa.featurize", "extract_msa_features", "extract_species_ids"],
+      "chain_types_tested": ["polypeptide(L)", "polyribonucleotide", "polydeoxyribonucleotide"]
+    },
+    "full_pipeline_reference.npz": {
+      "description": "Full MSA search pipeline: jackhmmer search + featurization",
+      "external_tools": ["jackhmmer (HMMER 3.4 with --seq_limit patch)"],
+      "database": "minimal_test_db.fasta (10 sequences, committed to repo)",
+      "pipeline_stages": ["MSA search (jackhmmer)", "A3M parsing", "Msa.featurize()"],
+      "notes": "Validates complete data pipeline parity between Linux and macOS"
+    }
+  },
+  "regeneration_command": "docker build --platform linux/amd64 -f docker/Dockerfile.reference -t alphafold3-reference . && docker run --platform linux/amd64 --rm -v $(pwd)/tests/fixtures/reference_outputs:/output alphafold3-reference"
+}

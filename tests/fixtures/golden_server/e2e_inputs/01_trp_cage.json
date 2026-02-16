@@ -1,0 +1,16 @@
+{
+  "name": "golden_01_trp_cage_1L2Y",
+  "modelSeeds": [
+    42
+  ],
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "NLYIQWLKDGGPSSGRPPPS"
+      }
+    }
+  ],
+  "dialect": "alphafold3",
+  "version": 2
+}

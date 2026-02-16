@@ -1,0 +1,23 @@
+[
+  {
+    "name": "golden_05_calmodulin_calcium_1CLL",
+    "modelSeeds": ["42"],
+    "sequences": [
+      {
+        "proteinChain": {
+          "sequence": "MADQLTEEQIAEFKEAFSLFDKDGDGTITTKELGTVMRSLGQNPTEAELQDMINEVDADGNGTIDFPEFLTMMARKMKDTDSEEEIREAFRVFDKDGNGYISAAELRHVMTNLGEKLTDEEVDEMIREADIDGDGQVNYEEFVQMMTAK",
+          "count": 1,
+          "maxTemplateDate": "2025-01-01"
+        }
+      },
+      {
+        "ion": {
+          "ion": "CA",
+          "count": 4
+        }
+      }
+    ],
+    "dialect": "alphafoldserver",
+    "version": 1
+  }
+]

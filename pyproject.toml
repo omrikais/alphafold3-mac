@@ -1,0 +1,102 @@
+[build-system]
+requires = [
+    "scikit_build_core",
+    "pybind11",
+    "cmake>=3.28",
+    "ninja",
+    "numpy",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "alphafold3"
+version = "3.0.1"
+description = "AlphaFold 3 protein structure prediction on Apple Silicon (MLX)"
+requires-python = ">=3.12"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Omri Kaisari"},
+]
+dependencies = [
+    "absl-py>=2.3.1",
+    "dm-haiku==0.0.16",
+    "jax==0.8.1",
+    "jax[cuda12]==0.8.1; sys_platform == 'linux'",
+    "mlx>=0.10.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "numpy",
+    "pyyaml>=6.0",
+    "rdkit>=2024.3.5",
+    "setuptools==78.1.1",
+    "tokamax==0.0.8; sys_platform == 'linux'",
+    "tqdm",
+    "zstandard",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "websockets>=14.0",
+    "aiosqlite>=0.20.0",
+    "pydantic>=2.5",
+    "gemmi>=0.7.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.urls]
+Repository = "https://github.com/omrikais/alphafold3-mac"
+Documentation = "https://github.com/omrikais/alphafold3-mac#documentation"
+"Original Paper" = "https://doi.org/10.1038/s41586-024-07487-w"
+"Upstream (Google DeepMind)" = "https://github.com/google-deepmind/alphafold3"
+
+[dependency-groups]
+dev = [
+    "dm-tree>=0.1.9",
+    "pytest>=6.0",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocs-git-revision-date-localized-plugin>=1.2",
+    "mkdocs-minify-plugin>=0.8",
+    "mkdocs-redirects>=1.2",
+    "mkdocs-section-index>=0.3",
+    "pymdown-extensions>=10.0",
+]
+
+[tool.uv]
+package = true
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "external_deps: marks tests requiring external dependencies like HMMER or databases",
+    "benchmark: marks memory/performance benchmark tests (may vary by hardware)",
+    "legacy_parity: legacy parity tests superseded by compliant tests in test_jax_numerical_parity.py",
+]
+
+[tool.scikit-build]
+wheel.exclude = [
+    "**.pyx",
+    "**/CMakeLists.txt",
+    "**.cc",
+    "**.h"
+]
+sdist.include = [
+    "LICENSE",
+]
+
+[tool.cibuildwheel]
+build = "cp3*-manylinux_x86_64"
+manylinux-x86_64-image = "manylinux_2_28"
+
+[project.scripts]
+build_data = "alphafold3.build_data:build_data"
+alphafold3-mlx = "run_alphafold_mlx:main"
+alphafold3-server = "alphafold3_mlx.api:main"

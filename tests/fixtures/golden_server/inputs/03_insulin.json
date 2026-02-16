@@ -1,0 +1,24 @@
+[
+  {
+    "name": "golden_03_insulin_3I40",
+    "modelSeeds": ["42"],
+    "sequences": [
+      {
+        "proteinChain": {
+          "sequence": "GIVEQCCTSICSLYQLENYCN",
+          "count": 1,
+          "maxTemplateDate": "2025-01-01"
+        }
+      },
+      {
+        "proteinChain": {
+          "sequence": "FVNQHLCGSHLVEALYLVCGERGFFYTPKT",
+          "count": 1,
+          "maxTemplateDate": "2025-01-01"
+        }
+      }
+    ],
+    "dialect": "alphafoldserver",
+    "version": 1
+  }
+]

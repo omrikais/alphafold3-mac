@@ -1,0 +1,96 @@
+site_name: AlphaFold3 Mac Port
+site_description: macOS/MLX user docs for setup, running, troubleshooting.
+repo_url: https://github.com/omrikais/alphafold3-mac
+repo_name: omrikais/alphafold3-mac
+docs_dir: docs
+
+theme:
+  name: material
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: grey
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: grey
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+
+plugins:
+  - search
+  - section-index
+  - git-revision-date-localized:
+      enable_creation_date: true
+      enable_git_follow: false
+      type: date
+  - minify:
+      minify_html: true
+  - redirects:
+      redirect_maps:
+        installation.md: getting-started/installation.md
+        input.md: user-guide/input-format.md
+        output.md: user-guide/output-format.md
+        pipeline_setup.md: getting-started/pipeline-setup.md
+        performance.md: user-guide/performance.md
+        hpc-apptainer-guide.md: user-guide/hpc-apptainer.md
+        model_parameters.md: reference/model-parameters.md
+        validation-policy-old.md: reference/validation-policy.md
+        contributing.md: contributing/index.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.inlinehilite
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Updating: getting-started/updating.md
+      - Quickstart: getting-started/quickstart.md
+      - Pipeline Setup (macOS): getting-started/pipeline-setup.md
+  - User Guide:
+      - Web Interface: user-guide/web-interface.md
+      - Input Format: user-guide/input-format.md
+      - Output Format: user-guide/output-format.md
+      - Restraint-Guided Docking: user-guide/restraint-guided-docking.md
+      - Performance: user-guide/performance.md
+      - Troubleshooting: user-guide/troubleshooting.md
+      - Known Issues: known_issues.md
+      - Community Tools: community_tools.md
+      - HPC / Apptainer: user-guide/hpc-apptainer.md
+  - Reference:
+      - CLI: reference/cli.md
+      - API: reference/api.md
+      - Model Parameters: reference/model-parameters.md
+      - Validation Policy: reference/validation-policy.md
+  - Contributing: contributing/index.md

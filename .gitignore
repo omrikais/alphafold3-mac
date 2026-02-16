@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model weights (large binary files — not distributed via git)
+/weights/
+*.pkl
+*.pickle
+*.msgpack
+
+# NPZ files (except golden test fixtures which are tracked)
+*.npz
+!tests/golden/*.npz
+!tests/fixtures/geometry_golden/*.npz
+
+# Genetic databases (too large for git)
+databases/
+public_databases/
+
+# Prediction output
+output/
+outputs/
+
+# MkDocs build output
+site/
+
+# Logs
+*.log
+wget-log*
+
+# Frontend build artifacts and local env overrides
+frontend/out/
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/.env*.local
+
+# API runtime data
+data/
+
+# Local configuration and server logs
+.dev-logs/
+.prod-logs/

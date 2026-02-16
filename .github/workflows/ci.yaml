@@ -1,0 +1,126 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: "build ${{ matrix.name-prefix }} (py ${{ matrix.python-version }} on ${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - name-prefix: "all tests"
+            python-version: '3.12'
+            os: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+        cache-dependency-glob: "uv.lock"
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: sudo apt-get install -y hmmer
+
+    - name: Install Python dependencies
+      run: uv sync --frozen --all-groups
+
+    - name: Build data
+      run: uv run build_data
+
+    - name: Run CPU-only tests
+      run: uv run python run_alphafold_data_test.py
+
+    - name: Run restraint validation tests (no weights required)
+      run: AF3_SKIP_PLATFORM_CHECK=1 PYTHONPATH=src uv run pytest tests/unit/test_restraint_types.py tests/unit/test_restraint_validate.py -v
+
+  docs:
+    name: "docs build (mkdocs --strict)"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+        cache-dependency-glob: "uv.lock"
+
+    - name: Set up Python 3.12
+      run: uv python install 3.12
+
+    - name: Install docs dependencies
+      run: uv sync --frozen --only-group docs --no-install-project
+
+    - name: Build docs (strict)
+      run: uv run mkdocs build --strict
+
+  frontend-tests:
+    name: "frontend tests (vitest)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    - name: Install dependencies
+      run: npm ci
+    - name: Run tests
+      run: npm test
+
+  path-leak-check:
+    name: Check for hardcoded developer paths
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+    - name: Scan production code for developer-specific paths
+      run: |
+        # Scope: production code only (src/, frontend/src/, entry point, shell scripts).
+        # Excludes: scripts/*.py (dev-only).
+        # Regex in variable so grep lines don't self-match install.sh.
+        SCAN_RE='/Volumes/|/Users/[a-zA-Z][a-zA-Z0-9_.\-]*/|/home/[a-zA-Z0-9][a-zA-Z0-9_.\-]*/' # PATH_SCAN_REGEX
+        LEAKED=$( \
+          grep -rn --include='*.py' --include='*.ts' --include='*.tsx' \
+            -E "$SCAN_RE" \
+            src/ frontend/src/ run_alphafold_mlx.py 2>/dev/null; \
+          grep -rn --include='*.sh' \
+            -E "$SCAN_RE" \
+            scripts/ 2>/dev/null \
+          || true)
+        # Filter known-safe patterns (including scanner regex definition lines)
+        LEAKED=$(echo "$LEAKED" \
+          | grep -v 'PATH_SCAN_REGEX' \
+          | grep -v 'CLAUDE\.md' \
+          | grep -v 'AGENTS\.md' \
+          | grep -v 'MEMORY\.md' \
+          | grep -v '__pycache__' \
+          | grep -v '\.pyc' \
+          | grep -v 'node_modules' \
+          | grep -v 'expanduser' \
+          | grep -v 'Path\.home' \
+          | grep -v '/\.' || true)
+        if [[ -n "$LEAKED" ]]; then
+          echo "::error::Developer-specific paths found in production code:"
+          echo "$LEAKED"
+          exit 1
+        fi
+        echo "No developer-specific paths found in production code."

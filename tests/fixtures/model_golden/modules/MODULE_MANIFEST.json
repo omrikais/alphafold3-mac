@@ -1,0 +1,68 @@
+{
+  "version": "3.0.0",
+  "description": "JAX CPU reference outputs for full module-level numerical parity validation",
+  "platform": "Darwin",
+  "python_version": "3.12.12 (main, Oct  9 2025, 11:07:00) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "jax_version": "0.8.1",
+  "generated_at": "2026-02-04T10:12:18.986946",
+  "files": {
+    "jax_gated_attention_module.npz": {
+      "description": "GatedSelfAttention module with weights and output",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    },
+    "jax_transition_module.npz": {
+      "description": "TransitionBlock (GLU feedforward) module",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    },
+    "jax_outer_product_module.npz": {
+      "description": "OuterProductMean module",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    },
+    "jax_triangle_mult_module.npz": {
+      "description": "TriangleMultiplication (outgoing/incoming) modules",
+      "tolerances": {
+        "rtol": 0.0001,
+        "atol": 1e-05
+      }
+    },
+    "jax_pairformer_module.npz": {
+      "description": "FULL PairFormerIteration with all intermediate outputs",
+      "tolerances": {
+        "rtol": 0.001,
+        "atol": 0.0001
+      }
+    },
+    "jax_diffusion_step_module.npz": {
+      "description": "DiffusionHead single denoising step",
+      "tolerances": {
+        "rtol": 0.001,
+        "atol": 0.0001
+      }
+    },
+    "jax_confidence_module.npz": {
+      "description": "ConfidenceHead pLDDT/PAE/PDE outputs",
+      "tolerances": {
+        "rtol": 0.001,
+        "atol": 0.0001
+      }
+    },
+    "jax_end_to_end_module.npz": {
+      "description": "End-to-end JAX reference coordinates",
+      "tolerances": {
+        "rmsd": 0.5
+      },
+      "note": "MLX MUST use exact same weights for RMSD < 0.5\u00c5"
+    }
+  },
+  "regeneration_command": "python scripts/generate_jax_module_references.py --output tests/fixtures/model_golden/modules/",
+  "note": "v3.0: Full PairFormer/Diffusion/Confidence outputs with weights for true numerical parity"
+}

@@ -1,0 +1,211 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap");
+
+html {
+  font-size: 16px;
+}
+
+:root {
+  --af3-card-bg-light: #ffffff;
+  --af3-card-bg-dark: #171717;
+  --af3-card-border-light: #e5e5e5;
+  --af3-card-border-dark: #303030;
+}
+
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: #f7f7f7;
+  --md-default-fg-color: #121212;
+  --md-default-fg-color--light: #3d3d3d;
+  --md-default-fg-color--lighter: #737373;
+  --md-primary-fg-color: #ffffff;
+  --md-primary-bg-color: #101010;
+  --md-typeset-a-color: #2f2f2f;
+  --md-accent-fg-color: #1f1f1f;
+  --md-code-bg-color: #efefef;
+  --md-code-fg-color: #222222;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0f0f10;
+  --md-default-fg-color: #dddddd;
+  --md-default-fg-color--light: #a6a6a6;
+  --md-default-fg-color--lighter: #8f8f8f;
+  --md-primary-fg-color: #111111;
+  --md-primary-bg-color: #e9e9e9;
+  --md-typeset-a-color: #cfcfcf;
+  --md-accent-fg-color: #f0f0f0;
+  --md-code-bg-color: #171718;
+  --md-code-fg-color: #d4d4d4;
+}
+
+body,
+.md-typeset {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.48;
+}
+
+.md-typeset h1 {
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.12;
+  font-size: 1.95rem;
+  margin-bottom: 0.6rem;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 600;
+}
+
+.md-typeset h2 {
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  font-size: 1.52rem;
+  line-height: 1.16;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset h3 {
+  font-size: 1.14rem;
+}
+
+.md-header,
+.md-tabs {
+  box-shadow: none;
+  border-bottom: 1px solid #262626;
+}
+
+:root {
+  --md-header-height: 2.75rem;
+}
+
+[data-md-color-scheme="default"] .md-header,
+[data-md-color-scheme="default"] .md-tabs {
+  background: #fcfcfc;
+  border-bottom-color: #e5e5e5;
+}
+
+[data-md-color-scheme="slate"] .md-header,
+[data-md-color-scheme="slate"] .md-tabs {
+  background: #101011;
+  border-bottom-color: #27272a;
+}
+
+.md-main__inner {
+  max-width: 1320px;
+}
+
+.md-header__title {
+  font-size: 0.96rem;
+  font-weight: 600;
+}
+
+.md-search__form {
+  border-radius: 999px;
+}
+
+.md-sidebar--primary {
+  border-right: 1px solid #242424;
+}
+
+[data-md-color-scheme="default"] .md-sidebar--primary {
+  border-right-color: #e1e1e1;
+}
+
+.md-nav--primary .md-nav__title {
+  font-size: 0.8rem;
+}
+
+.md-nav--primary .md-nav__link {
+  border-radius: 10px;
+  padding: 0.22rem 0.44rem;
+  font-size: 0.82rem;
+}
+
+.md-nav--primary .md-nav__link--active {
+  background: #1a1a1a;
+  color: #f0f0f0;
+}
+
+[data-md-color-scheme="default"] .md-nav--primary .md-nav__link--active {
+  background: #eeeeee;
+  color: #141414;
+}
+
+.md-nav__title,
+.md-nav__link,
+.md-tabs__link {
+  font-weight: 500;
+}
+
+.md-nav__link:hover,
+.md-tabs__link:hover,
+.md-typeset a:hover {
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset a {
+  text-decoration: none;
+  border-bottom: 1px solid rgba(150, 150, 150, 0.42);
+}
+
+.md-typeset pre code {
+  font-size: 0.8rem;
+}
+
+.md-sidebar--secondary .md-nav__title,
+.md-sidebar--secondary .md-nav__link {
+  font-size: 0.8rem;
+}
+
+.doc-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: #b28a5c;
+  margin: 0.4rem 0 0.25rem;
+}
+
+.md-typeset blockquote {
+  border-left: 2px solid #9a9a9a;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .admonition {
+  border-radius: 10px;
+  border-width: 1px;
+  box-shadow: none;
+}
+
+.md-typeset .admonition.info {
+  border-color: #2f4838;
+  background: rgba(29, 52, 38, 0.36);
+}
+
+.md-typeset .admonition.warning {
+  border-color: #614422;
+  background: rgba(77, 52, 20, 0.3);
+}
+
+.md-typeset code,
+.md-typeset pre code {
+  font-family: "JetBrains Mono", "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.md-typeset table:not([class]) {
+  font-size: 0.88rem;
+}
+
+@media (max-width: 900px) {
+  .md-typeset h1 {
+    font-size: 1.55rem;
+  }
+
+  .md-typeset h2 {
+    font-size: 1.25rem;
+  }
+}
