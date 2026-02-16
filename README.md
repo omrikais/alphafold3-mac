@@ -1,9 +1,11 @@
 # AlphaFold 3 for Mac
 
 Run [AlphaFold 3](https://github.com/google-deepmind/alphafold3) protein
-structure prediction natively on Apple Silicon. The model inference layer is
-rewritten in [MLX](https://github.com/ml-explore/mlx) while the data pipeline
-and output format remain fully compatible with the original.
+structure prediction natively on Apple Silicon Macs (M1, M2, M3, M4). The
+model inference layer is rewritten in Apple's
+[MLX](https://github.com/ml-explore/mlx) framework while the data pipeline
+and output format remain fully compatible with the original. No NVIDIA GPU
+or Linux required.
 
 ## Highlights
 
