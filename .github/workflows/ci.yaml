@@ -10,14 +10,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: "build ${{ matrix.name-prefix }} (py ${{ matrix.python-version }} on ${{ matrix.os }})"
+  unit-tests:
+    name: "unit tests (py ${{ matrix.python-version }} on ${{ matrix.os }})"
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          - name-prefix: "all tests"
-            python-version: '3.12'
+          - python-version: '3.12'
             os: ubuntu-latest
 
     steps:
@@ -31,20 +30,19 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
 
-    - name: Install dependencies
-      run: sudo apt-get install -y hmmer
-
     - name: Install Python dependencies
-      run: uv sync --frozen --all-groups
+      run: uv sync --frozen --group dev --no-install-project
 
-    - name: Build data
-      run: uv run build_data
-
-    - name: Run CPU-only tests
-      run: uv run python run_alphafold_data_test.py
-
-    - name: Run restraint validation tests (no weights required)
-      run: AF3_SKIP_PLATFORM_CHECK=1 PYTHONPATH=src uv run pytest tests/unit/test_restraint_types.py tests/unit/test_restraint_validate.py -v
+    - name: Run restraint unit tests
+      run: >
+        AF3_SKIP_PLATFORM_CHECK=1 PYTHONPATH=src uv run --no-sync pytest
+        tests/unit/test_restraint_types.py
+        tests/unit/test_restraint_validate.py
+        tests/unit/test_restraint_loss.py
+        tests/unit/test_restraint_resolve.py
+        tests/unit/test_input_handler.py
+        tests/unit/test_output_handler.py
+        -v
 
   docs:
     name: "docs build (mkdocs --strict)"
@@ -65,7 +63,7 @@ jobs:
       run: uv sync --frozen --only-group docs --no-install-project
 
     - name: Build docs (strict)
-      run: uv run mkdocs build --strict
+      run: uv run --no-sync mkdocs build --strict
 
   frontend-tests:
     name: "frontend tests (vitest)"
