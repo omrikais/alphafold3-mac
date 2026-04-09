@@ -1,23 +1,66 @@
 # AlphaFold 3 for Mac
 
 Run [AlphaFold 3](https://github.com/google-deepmind/alphafold3) protein
-structure prediction natively on Apple Silicon Macs (M1, M2, M3, M4). The
-model inference layer is rewritten in Apple's
-[MLX](https://github.com/ml-explore/mlx) framework while the data pipeline
-and output format remain fully compatible with the original. No NVIDIA GPU
-or Linux required.
+structure prediction natively on Apple Silicon Macs. The model inference layer
+is rewritten in Apple's [MLX](https://github.com/ml-explore/mlx) framework
+while the data pipeline and output format remain fully compatible with the
+original. No NVIDIA GPU or Linux required.
 
-## Highlights
+<p align="center">
+  <img src="docs/images/results-structure.png" alt="Results page showing a predicted multi-chain protein structure with confidence metrics, interactive 3D viewer, and sample ranking" width="820" />
+</p>
 
-- **Native Apple Silicon** -- M1, M2, M3, and M4 (Max/Ultra) with unified memory
-- **Web interface** -- Submit jobs, track progress, and visualize 3D structures
-  in the browser (Next.js + Mol\*)
-- **CLI** -- Single-command predictions from the terminal
-- **Restraint-guided docking** -- Specify distance and contact restraints to
-  guide multi-chain docking during diffusion
-- **MSA caching** -- Content-addressed cache skips redundant HMMER searches
-- **Sequence-only mode** -- Run without genetic databases when they are
+## Features
+
+### Predict and visualize in the browser
+
+Submit jobs, track real-time progress, and explore results -- all from a local
+web interface. The 3D viewer ([Mol\*](https://molstar.org)) lets you rotate,
+zoom, and inspect the predicted structure interactively.
+
+<p align="center">
+  <img src="docs/images/home-fresh.png" alt="Home page with prediction setup form, entity builder, and job history sidebar" width="820" />
+</p>
+
+### Build complex inputs visually
+
+Define multi-chain complexes with proteins, nucleic acids, ligands, and ions.
+Paste sequences, look up PDB entries, add post-translational modifications per
+residue, or upload existing input files. The entity builder validates input in
+real time.
+
+<p align="center">
+  <img src="docs/images/prediction-setup.png" alt="Prediction setup with multiple entity types including protein sequences, PTM modification grid, and ligand input" width="820" />
+</p>
+
+### Guide docking with restraints
+
+Specify distance, contact, or repulsive restraints between chains to steer the
+diffusion process during structure generation. After prediction, a dedicated
+satisfaction panel reports which restraints were met and which were violated.
+
+<p align="center">
+  <img src="docs/images/restraint-editor.png" alt="Restraint-guided docking editor with distance restraints, chain and atom selectors, and guidance parameters" width="820" />
+</p>
+
+### Analyze confidence at every level
+
+Results include per-residue confidence (pLDDT), predicted aligned error (PAE),
+global fold confidence (pTM), and interface confidence (ipTM) for multi-chain
+complexes. Multi-sample ranking helps you pick the best prediction.
+
+<p align="center">
+  <img src="docs/images/restrained-results.png" alt="Restrained docking results with confidence metrics, pLDDT chart, PAE heatmap, and restraint satisfaction panel" width="820" />
+</p>
+
+### More highlights
+
+- **Native Apple Silicon** -- M1 through M4 (Max and Ultra) with unified memory
+- **CLI** -- single-command predictions from the terminal
+- **MSA caching** -- content-addressed cache skips redundant HMMER searches
+- **Sequence-only mode** -- run without genetic databases when they are
   unavailable
+- **REST API** -- programmatic access for automation and pipelines
 
 ## Supported Hardware
 
@@ -87,13 +130,13 @@ Key pages:
 ## Architecture
 
 ```
-Web UI + REST API Next.js 15 + FastAPI
-        ↓
+Web UI + REST API          Next.js 15 + FastAPI
+        |
 Data Pipeline (unchanged) HMMER / MSA / Templates
-        ↓
-Model Inference (MLX) Evoformer → Diffusion → Confidence
-        ↓
-Post-processing mmCIF output, confidence scores
+        |
+Model Inference (MLX)      Evoformer -> Diffusion -> Confidence
+        |
+Post-processing            mmCIF output, confidence scores
 ```
 
 The original `src/alphafold3/` data pipeline is preserved. Model inference lives
