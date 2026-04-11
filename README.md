@@ -7,7 +7,7 @@ while the data pipeline and output format remain fully compatible with the
 original. No NVIDIA GPU or Linux required.
 
 <p align="center">
-  <img src="docs/images/results-structure.png" alt="Results page showing a predicted multi-chain protein structure with confidence metrics, interactive 3D viewer, and sample ranking" width="820" />
+  <img src="docs/images/results-structure.png?v=2" alt="Results page showing a predicted multi-chain protein structure with confidence metrics, interactive 3D viewer, and sample ranking" width="820" />
 </p>
 
 ## Features
@@ -50,7 +50,7 @@ global fold confidence (pTM), and interface confidence (ipTM) for multi-chain
 complexes. Multi-sample ranking helps you pick the best prediction.
 
 <p align="center">
-  <img src="docs/images/restrained-results.png" alt="Restrained docking results with confidence metrics, pLDDT chart, PAE heatmap, and restraint satisfaction panel" width="820" />
+  <img src="docs/images/restrained-results.png?v=2" alt="Restrained docking results with confidence metrics, pLDDT chart, PAE heatmap, and restraint satisfaction panel" width="820" />
 </p>
 
 ### More highlights
