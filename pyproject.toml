@@ -41,7 +41,7 @@ api = [
     "aiosqlite>=0.20.0",
     "pydantic>=2.5",
     "gemmi>=0.7.0",
-    "python-multipart>=0.0.9",
+    "python-multipart>=0.0.26",
 ]
 
 [project.urls]
