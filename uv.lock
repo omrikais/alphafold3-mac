@@ -591,14 +591,14 @@ wheels = [
 
 [[package]]
 name = "gitpython"
-version = "3.1.47"
+version = "3.1.50"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gitdb", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c1/bd/50db468e9b1310529a19fce651b3b0e753b5c07954d486cba31bbee9a5d5/gitpython-3.1.47.tar.gz", hash = "sha256:dba27f922bd2b42cb54c87a8ab3cb6beb6bf07f3d564e21ac848913a05a8a3cd", size = 216978, upload-time = "2026-04-22T02:44:44.059Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/33/f6/354ae6491228b5eb40e10d89c4d13c651fe1cf7556e35ebdded50cff57ce/gitpython-3.1.50.tar.gz", hash = "sha256:80da2d12504d52e1f998772dc5baf6e553f8d2fcfe1fcc226c9d9a2ee3372dcc", size = 219798, upload-time = "2026-05-06T04:01:26.571Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/c5/a1bc0996af85757903cf2bf444a7824e68e0035ce63fb41d6f76f9def68b/gitpython-3.1.47-py3-none-any.whl", hash = "sha256:489f590edfd6d20571b2c0e72c6a6ac6915ee8b8cd04572330e3842207a78905", size = 209547, upload-time = "2026-04-22T02:44:41.271Z" },
+    { url = "https://files.pythonhosted.org/packages/20/7a/1c6e3562dfd8950adbb11ffbc65d21e7c89d01a6e4f137fa981056de25c5/gitpython-3.1.50-py3-none-any.whl", hash = "sha256:d352abe2908d07355014abdd21ddf798c2a961469239afec4962e9da884858f9", size = 212507, upload-time = "2026-05-06T04:01:23.799Z" },
 ]
 
 [[package]]
@@ -2323,7 +2323,8 @@ dependencies = [
     { name = "tqdm", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
     { name = "typeguard", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
     { name = "typing-extensions", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "xprof", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
+    { name = "xprof", version = "2.21.3", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "xprof", version = "2.22.2", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ee/56/3ce59293cc7d5993f559410992e7ae8db10d72f8552ac6033e16f40e6997/tokamax-0.0.8.tar.gz", hash = "sha256:75987d1353c01925de0730cd460b9d7ef01d2cdfdd6ee3fed640f633fdb59e4b", size = 253167, upload-time = "2025-11-25T06:10:37.541Z" }
 wheels = [
@@ -2609,20 +2610,49 @@ wheels = [
 name = "xprof"
 version = "2.21.3"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'x86_64' and sys_platform == 'linux'",
+]
 dependencies = [
-    { name = "cheroot", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "etils", extra = ["epath"], marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "fsspec", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "gcsfs", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "gviz-api", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "protobuf", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "setuptools", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "six", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
-    { name = "werkzeug", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')" },
+    { name = "cheroot", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "etils", extra = ["epath"], marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "fsspec", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "gcsfs", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "gviz-api", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "protobuf", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "setuptools", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "six", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "werkzeug", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/2e/5bff292a49774f507c21c4220076f3214483ce77a70295f596816c33602b/xprof-2.21.3-cp312-none-manylinux2014_x86_64.whl", hash = "sha256:279df925f48e7653ce01b949eaeafcf59d350725da6b63e806a1ee435463d49d", size = 21269738, upload-time = "2025-12-02T14:17:14.122Z" },
     { url = "https://files.pythonhosted.org/packages/cd/9a/a3d4bc3f4693d6a70729d08c54d837034d1bff0ac77f654a4c2a8f1a540d/xprof-2.21.3-cp313-none-manylinux2014_x86_64.whl", hash = "sha256:f2e453c589a73b8e5bc6c96e702e9b18c4a26b1b981c7dc98f61f7216db092e5", size = 21270229, upload-time = "2025-12-02T14:14:42.887Z" },
+]
+
+[[package]]
+name = "xprof"
+version = "2.22.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version == '3.13.*' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version < '3.13' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+]
+dependencies = [
+    { name = "cheroot", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "etils", extra = ["epath"], marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "fsspec", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "gcsfs", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "gviz-api", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "protobuf", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "setuptools", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "six", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "werkzeug", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4f/fb/1da7ad2d5a412e8304bd0143b6c28d58db943b984ec0dec21131bee0712f/xprof-2.22.2-py3-none-manylinux_2_35_aarch64.whl", hash = "sha256:2cc2663c4db8c6deafa92ef4b0d0478fa27694401105b6e2a62c0a0d5ab7e995", size = 42125584, upload-time = "2026-04-13T19:08:34.153Z" },
 ]
 
 [[package]]
