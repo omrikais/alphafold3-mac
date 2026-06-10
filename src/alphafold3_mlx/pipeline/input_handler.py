@@ -66,8 +66,8 @@ class Sequence:
             return
 
         # Validate sequence characters based on type
-        valid_chars = self._get_valid_chars
-        invalid_chars = set(self.sequence.upper) - valid_chars
+        valid_chars = self._get_valid_chars()
+        invalid_chars = set(self.sequence.upper()) - valid_chars
         if invalid_chars:
             raise InputError(
                 f"Invalid characters in {self.chain_type} sequence for chain {self.chain_id}: "
@@ -81,8 +81,8 @@ class Sequence:
         elif self.chain_type in ("rna", "dna"):
             return set("ACGTURYSWKMBDHVN") # Standard + IUPAC ambiguous
         elif self.chain_type == "ligand":
-            return set # Ligands use SMILES, different validation
-        return set
+            return set() # Ligands use SMILES, different validation
+        return set()
 
 
 @dataclass
@@ -352,12 +352,12 @@ def parse_input_json(input_path: Path) -> FoldInput:
     Raises:
         InputError: If file cannot be parsed or is invalid.
     """
-    if not input_path.exists:
+    if not input_path.exists():
         raise InputError(f"Input file not found: {input_path}")
 
     try:
         with open(input_path, "r") as f:
-            json_str = f.read
+            json_str = f.read()
     except IOError as e:
         raise InputError(f"Failed to read input file: {e}")
 
@@ -374,7 +374,7 @@ def parse_input_json(input_path: Path) -> FoldInput:
             import warnings
             warnings.warn(
                 f"AlphaFold Server file contains {len(raw_json)} fold jobs, "
-                "processing only the first one. Use load_fold_inputs for batch processing.",
+                "processing only the first one. Use load_fold_inputs() for batch processing.",
                 stacklevel=2,
             )
         raw_json = raw_json[0]
@@ -626,11 +626,11 @@ def _parse_input_dict(data: dict[str, Any]) -> InputJSON:
     # Extract optional MSA/template paths
     msa_paths = None
     if "msa_paths" in data:
-        msa_paths = {k: Path(v) for k, v in data["msa_paths"].items}
+        msa_paths = {k: Path(v) for k, v in data["msa_paths"].items()}
 
     template_paths = None
     if "template_paths" in data:
-        template_paths = {k: Path(v) for k, v in data["template_paths"].items}
+        template_paths = {k: Path(v) for k, v in data["template_paths"].items()}
 
     return InputJSON(
         name=name,
@@ -736,12 +736,12 @@ def load_fold_inputs(input_path: Path) -> Iterator[FoldInput]:
             result = run_inference(fold_input)
             # fold_input.restraints and fold_input.guidance are available
     """
-    if not input_path.exists:
+    if not input_path.exists():
         raise InputError(f"Input file not found: {input_path}")
 
     try:
         with open(input_path, "r") as f:
-            json_str = f.read
+            json_str = f.read()
     except IOError as e:
         raise InputError(f"Failed to read input file: {e}")
 
@@ -918,7 +918,7 @@ def check_memory_available(
         # M-02: Detect actual memory instead of assuming 128GB
         try:
             import psutil
-            available = psutil.virtual_memory.total / (1024**3)
+            available = psutil.virtual_memory().total / (1024**3)
         except ImportError:
             try:
                 pages = os.sysconf('SC_PHYS_PAGES')
@@ -938,7 +938,7 @@ def check_memory_available(
 
     # Phase 3 module available, use proper validation
     num_residues = fold_input.total_residues
-    available_gb = get_available_memory_gb
+    available_gb = get_available_memory_gb()
 
     try:
         check_memory_requirements(
@@ -966,7 +966,7 @@ def load_restraints_file(restraints_path: Path) -> tuple[Any, Any]:
     Raises:
         InputError: If the file cannot be read, parsed, or is invalid.
     """
-    if not restraints_path.exists:
+    if not restraints_path.exists():
         raise InputError(f"Restraints file not found: {restraints_path}")
 
     try:
@@ -989,7 +989,7 @@ def load_restraints_file(restraints_path: Path) -> tuple[Any, Any]:
         )
 
     allowed_keys = {"restraints", "guidance"}
-    unexpected = set(data.keys) - allowed_keys
+    unexpected = set(data.keys()) - allowed_keys
     if unexpected:
         raise InputError(
             f"Restraints file contains unexpected top-level keys: "
