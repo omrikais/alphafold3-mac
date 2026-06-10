@@ -9,38 +9,12 @@ This module exports:
 - Validation utilities
 """
 
-# Phase 0: Attention-specific types
-from alphafold3_mlx.core.config import AttentionConfig
-from alphafold3_mlx.core.inputs import AttentionInputs
-from alphafold3_mlx.core.outputs import AttentionOutput
-from alphafold3_mlx.core.intermediates import AttentionIntermediates
-from alphafold3_mlx.core.validation import ValidationResult
-from alphafold3_mlx.core.golden import GoldenOutputs
-from alphafold3_mlx.core.benchmark import BenchmarkResult
-
-# Phase 0: Constants
+# Pure-Python modules — no MLX dependency
 from alphafold3_mlx.core.constants import (
     TOLERANCES,
     AF3_SHAPES,
     MEMORY_RATIO_THRESHOLD,
     DEFAULT_MASK_VALUE,
-)
-
-# Phase 3: Model configuration dataclasses
-from alphafold3_mlx.core.config import (
-    PairFormerConfig,
-    TemplateConfig,
-    MSAStackConfig,
-    SampleConfig,
-    EvoformerConfig,
-    DiffusionConfig,
-    ConfidenceConfig,
-    GlobalConfig,
-    ModelConfig,
-)
-
-# Phase 3: Model constants
-from alphafold3_mlx.core.constants import (
     SIGMA_DATA,
     SIGMA_MAX,
     SIGMA_MIN,
@@ -64,29 +38,6 @@ from alphafold3_mlx.core.constants import (
     MIN_VALID_FRACTION,
 )
 
-# Phase 3: Core entities
-from alphafold3_mlx.core.entities import (
-    Embeddings,
-    AtomPositions,
-    ConfidenceScores,
-    NoiseSchedule,
-    GatherInfo,
-)
-
-# Phase 3: Input types
-from alphafold3_mlx.core.inputs import (
-    TokenFeatures,
-    MSAFeatures,
-    TemplateFeatures,
-    FrameFeatures,
-    BondInfo,
-    FeatureBatch,
-)
-
-# Phase 3: Output types
-from alphafold3_mlx.core.outputs import ModelResult
-
-# Phase 3: Exceptions
 from alphafold3_mlx.core.exceptions import (
     NaNError,
     MemoryError,
@@ -95,31 +46,61 @@ from alphafold3_mlx.core.exceptions import (
     ValidationError,
 )
 
+# MLX-dependent modules — deferred so pure-Python code (restraint
+# validation, constants) can be imported on Linux CI without MLX.
+_mlx_available = False
+try:
+    import mlx.core  # noqa: F401
+    _mlx_available = True
+except ImportError:
+    pass
+
+if _mlx_available:
+    from alphafold3_mlx.core.config import AttentionConfig
+    from alphafold3_mlx.core.inputs import AttentionInputs
+    from alphafold3_mlx.core.outputs import AttentionOutput
+    from alphafold3_mlx.core.intermediates import AttentionIntermediates
+    from alphafold3_mlx.core.validation import ValidationResult
+    from alphafold3_mlx.core.golden import GoldenOutputs
+    from alphafold3_mlx.core.benchmark import BenchmarkResult
+
+    from alphafold3_mlx.core.config import (
+        PairFormerConfig,
+        TemplateConfig,
+        MSAStackConfig,
+        SampleConfig,
+        EvoformerConfig,
+        DiffusionConfig,
+        ConfidenceConfig,
+        GlobalConfig,
+        ModelConfig,
+    )
+
+    from alphafold3_mlx.core.entities import (
+        Embeddings,
+        AtomPositions,
+        ConfidenceScores,
+        NoiseSchedule,
+        GatherInfo,
+    )
+
+    from alphafold3_mlx.core.inputs import (
+        TokenFeatures,
+        MSAFeatures,
+        TemplateFeatures,
+        FrameFeatures,
+        BondInfo,
+        FeatureBatch,
+    )
+
+    from alphafold3_mlx.core.outputs import ModelResult
+
 __all__ = [
-    # Phase 0: Attention
-    "AttentionConfig",
-    "AttentionInputs",
-    "AttentionOutput",
-    "AttentionIntermediates",
-    "ValidationResult",
-    "GoldenOutputs",
-    "BenchmarkResult",
-    # Phase 0: Constants
+    # Constants (always available)
     "TOLERANCES",
     "AF3_SHAPES",
     "MEMORY_RATIO_THRESHOLD",
     "DEFAULT_MASK_VALUE",
-    # Phase 3: Configuration
-    "PairFormerConfig",
-    "TemplateConfig",
-    "MSAStackConfig",
-    "SampleConfig",
-    "EvoformerConfig",
-    "DiffusionConfig",
-    "ConfidenceConfig",
-    "GlobalConfig",
-    "ModelConfig",
-    # Phase 3: Constants
     "SIGMA_DATA",
     "SIGMA_MAX",
     "SIGMA_MIN",
@@ -141,25 +122,47 @@ __all__ = [
     "BOND_LENGTH_TOLERANCE",
     "BOND_ANGLE_TOLERANCE",
     "MIN_VALID_FRACTION",
-    # Phase 3: Entities
-    "Embeddings",
-    "AtomPositions",
-    "ConfidenceScores",
-    "NoiseSchedule",
-    "GatherInfo",
-    # Phase 3: Inputs
-    "TokenFeatures",
-    "MSAFeatures",
-    "TemplateFeatures",
-    "FrameFeatures",
-    "BondInfo",
-    "FeatureBatch",
-    # Phase 3: Outputs
-    "ModelResult",
-    # Phase 3: Exceptions
+    # Exceptions (always available)
     "NaNError",
     "MemoryError",
     "ShapeMismatchError",
     "WeightsNotFoundError",
     "ValidationError",
 ]
+
+if _mlx_available:
+    __all__ += [
+        # Attention
+        "AttentionConfig",
+        "AttentionInputs",
+        "AttentionOutput",
+        "AttentionIntermediates",
+        "ValidationResult",
+        "GoldenOutputs",
+        "BenchmarkResult",
+        # Configuration
+        "PairFormerConfig",
+        "TemplateConfig",
+        "MSAStackConfig",
+        "SampleConfig",
+        "EvoformerConfig",
+        "DiffusionConfig",
+        "ConfidenceConfig",
+        "GlobalConfig",
+        "ModelConfig",
+        # Entities
+        "Embeddings",
+        "AtomPositions",
+        "ConfidenceScores",
+        "NoiseSchedule",
+        "GatherInfo",
+        # Inputs
+        "TokenFeatures",
+        "MSAFeatures",
+        "TemplateFeatures",
+        "FrameFeatures",
+        "BondInfo",
+        "FeatureBatch",
+        # Outputs
+        "ModelResult",
+    ]
