@@ -8,8 +8,12 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from alphafold3_mlx.api.models import JobStatus
+
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websocket"])
+
+_TERMINAL_STATUSES = frozenset({JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED})
 
 
 @router.websocket("/api/jobs/{job_id}/progress")
@@ -75,7 +79,7 @@ async def job_progress_ws(websocket: WebSocket, job_id: str) -> None:
         return
 
     # If already terminal, send final state and close
-    if job.status.value in ("completed", "failed", "cancelled"):
+    if job.status in _TERMINAL_STATUSES:
         await websocket.send_json({
             "type": job.status.value,
             "percent_complete": job.progress,
@@ -94,7 +98,7 @@ async def job_progress_ws(websocket: WebSocket, job_id: str) -> None:
                 await websocket.send_text(msg_str)
 
                 # Check for terminal messages
-                if any(t in msg_str for t in ('"completed"', '"failed"', '"cancelled"')):
+                if any(f'"{s.value}"' in msg_str for s in _TERMINAL_STATUSES):
                     break
             except asyncio.TimeoutError:
                 # Send ping/keepalive

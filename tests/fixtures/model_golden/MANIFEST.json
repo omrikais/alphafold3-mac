@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "description": "Model golden reference outputs for numerical parity validation",
+  "description": "Model golden reference outputs for validation",
   "platform": "Darwin",
   "python_version": "3.12.12 (main, Oct  9 2025, 11:07:00) [Clang 17.0.0 (clang-1700.6.3.2)]",
   "generated_at": "2026-02-03T12:46:10.853645",

@@ -11,7 +11,7 @@ This module validates:
     - Vec3Array/Rot3Array parity with JAX
     - Linear/LayerNorm/GLU parity with Haiku/JAX
     - Reduced precision (float16/bfloat16) parity
-    -: Numerical accuracy requirements
+    - Numerical accuracy requirements
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def skip_if_no_golden():
         pytest.skip(f"Golden outputs not found at {GOLDEN_DIR}. Run generate_geometry_golden.py first.")
 
 
-# Tolerances for different dtypes (per)
+# Tolerances for different dtypes (per )
 TOLERANCES = {
     "float32": {"rtol": 1e-5, "atol": 1e-5},
     "float16": {"rtol": 2e-3, "atol": 5e-4},
@@ -45,14 +45,18 @@ TOLERANCES = {
 class TestVec3ArrayJaxParity:
     """Tests for Vec3Array parity with JAX."""
 
+    _golden = None
+
     @pytest.fixture(autouse=True)
     def setup(self):
-        """Load golden outputs."""
+        """Load golden outputs (cached at class level)."""
         skip_if_no_golden()
         golden_file = GOLDEN_DIR / "vec3array_ops.npz"
         if not golden_file.exists():
             pytest.skip(f"Golden file not found: {golden_file}")
-        self.golden = np.load(golden_file)
+        if TestVec3ArrayJaxParity._golden is None:
+            TestVec3ArrayJaxParity._golden = np.load(golden_file)
+        self.golden = TestVec3ArrayJaxParity._golden
 
     @pytest.mark.parametrize(
         "shape,dtype",
@@ -228,14 +232,18 @@ class TestVec3ArrayJaxParity:
 class TestRot3ArrayJaxParity:
     """Tests for Rot3Array parity with JAX."""
 
+    _golden = None
+
     @pytest.fixture(autouse=True)
     def setup(self):
-        """Load golden outputs."""
+        """Load golden outputs (cached at class level)."""
         skip_if_no_golden()
         golden_file = GOLDEN_DIR / "rot3array_ops.npz"
         if not golden_file.exists():
             pytest.skip(f"Golden file not found: {golden_file}")
-        self.golden = np.load(golden_file)
+        if TestRot3ArrayJaxParity._golden is None:
+            TestRot3ArrayJaxParity._golden = np.load(golden_file)
+        self.golden = TestRot3ArrayJaxParity._golden
 
     @pytest.mark.parametrize(
         "shape,dtype",
@@ -577,14 +585,18 @@ class TestRot3ArrayJaxParity:
 class TestModulesJaxParity:
     """Tests for neural network modules parity with JAX."""
 
+    _golden = None
+
     @pytest.fixture(autouse=True)
     def setup(self):
-        """Load golden outputs."""
+        """Load golden outputs (cached at class level)."""
         skip_if_no_golden()
         golden_file = GOLDEN_DIR / "modules_outputs.npz"
         if not golden_file.exists():
             pytest.skip(f"Golden file not found: {golden_file}")
-        self.golden = np.load(golden_file)
+        if TestModulesJaxParity._golden is None:
+            TestModulesJaxParity._golden = np.load(golden_file)
+        self.golden = TestModulesJaxParity._golden
 
     def test_linear_parity_float32(self):
         """Test Linear forward pass matches JAX."""

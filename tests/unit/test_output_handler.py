@@ -464,7 +464,7 @@ class TestWriteRankedOutputs:
             assert (output_dir / "timing.json").exists()
 
     def test_write_ranked_outputs_with_token_metadata(self) -> None:
-        """ : Verify token_metadata is used for mmCIF chain labeling.
+        """Verify token_metadata is used for mmCIF chain labeling.
 
         Phase 2 alignment: token_metadata (aatype, residue_index, asym_id) from
         the featurisation batch should be passed through to mmCIF generation

@@ -107,11 +107,14 @@ _BIAS = [
 ]
 
 
+# Pre-constructed MLX arrays (avoid rebuilding on every call)
+_WEIGHT_ARRAY = mx.array(_WEIGHT, dtype=mx.float32)
+_BIAS_ARRAY = mx.array(_BIAS, dtype=mx.float32)
+
+
 def noise_embeddings(sigma_scaled_noise_level: mx.array) -> mx.array:
     """Fourier noise level embeddings (AF3 JAX parity)."""
     transformed = 0.25 * mx.log(sigma_scaled_noise_level)
-    weight = mx.array(_WEIGHT, dtype=mx.float32)
-    bias = mx.array(_BIAS, dtype=mx.float32)
-    embeddings = transformed[..., None] * weight + bias
+    embeddings = transformed[..., None] * _WEIGHT_ARRAY + _BIAS_ARRAY
     return mx.cos(2 * mx.pi * embeddings)
 

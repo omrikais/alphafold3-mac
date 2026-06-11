@@ -25,6 +25,8 @@ from typing import Any
 import mlx.core as mx
 import mlx.nn as nn
 
+from tests.unit.conftest import load_golden_data
+
 
 # ============================================================================
 # Reference file paths and tolerance specifications
@@ -42,16 +44,6 @@ TOLERANCES = {
 
 # RMSD tolerance
 SC003_RMSD_TOLERANCE = 0.5  # Angstrom
-
-
-def _check_ref_file(path: Path, ref_name: str) -> None:
-    """Fail with clear error if reference file missing."""
-    if not path.exists():
-        raise FileNotFoundError(
-            f" reference file missing: {path}\n"
-            f"Generate it with: python scripts/generate_jax_af3_references.py "
-            f"--output {JAX_AF3_REF_DIR}/"
-        )
 
 
 def _load_manifest() -> dict[str, Any]:
@@ -864,11 +856,13 @@ class TestPairFormerJAXAF3Parity:
     def ref_data(self) -> np.lib.npyio.NpzFile:
         """Load PairFormer reference data."""
         ref_path = JAX_AF3_REF_DIR / "pairformer_ref.npz"
-        _check_ref_file(ref_path, "pairformer_ref.npz")
-        return np.load(ref_path, allow_pickle=True)
+        return load_golden_data(
+            str(ref_path),
+            "python scripts/generate_jax_af3_references.py",
+        )
 
-    def test_pairformer_single_output_matches_jax(self, ref_data):
-        """Test PairFormer single output matches JAX AF3 reference."""
+    def _build_and_load_pairformer(self, ref_data):
+        """Build PairFormerIteration and load weights from reference data."""
         from alphafold3_mlx.network.pairformer import PairFormerIteration
 
         _check_sc002_compliance(ref_data)
@@ -888,7 +882,6 @@ class TestPairFormerJAXAF3Parity:
         )
 
         # Zero-initialize OuterProductMean if weights not in reference
-        # This makes it a no-op for backward compatibility with older references
         if "params/pairformer/outer_product_mean/output_proj/w" not in ref_data.keys():
             module.outer_product_mean.output_proj.weight = mx.zeros_like(
                 module.outer_product_mean.output_proj.weight
@@ -948,21 +941,25 @@ class TestPairFormerJAXAF3Parity:
         )
         load_transition_weights(module.single_transition, single_trans_params)
 
-        # Load inputs
+        # Load inputs and run forward pass
         single_input = mx.array(ref_data["single_input"])[None, ...]
         pair_input = mx.array(ref_data["pair_input"])[None, ...]
         seq_mask = mx.array(ref_data["seq_mask"])[None, ...]
         pair_mask = mx.array(ref_data["pair_mask"])[None, ...]
 
-        # Run MLX forward
         single_out, pair_out = module(single_input, pair_input, seq_mask, pair_mask)
         mx.eval(single_out, pair_out)
 
-        # Compare - squeeze batch dimension from both
+        return np.array(single_out)[0], np.array(pair_out)[0]
+
+    def test_pairformer_outputs_match_jax(self, ref_data):
+        """Test PairFormer single and pair outputs match JAX AF3 reference."""
+        mlx_single_out, mlx_pair_out = self._build_and_load_pairformer(ref_data)
+
+        # Compare single output
         jax_single_out = np.array(ref_data["single_output"])
         if jax_single_out.ndim == 3 and jax_single_out.shape[0] == 1:
             jax_single_out = jax_single_out[0]
-        mlx_single_out = np.array(single_out)[0]
 
         np.testing.assert_allclose(
             mlx_single_out,
@@ -972,104 +969,10 @@ class TestPairFormerJAXAF3Parity:
             err_msg="FAILED: PairFormer single output differs from JAX reference",
         )
 
-        print(f"\n=== PairFormer Single Output Parity PASSED ===")
-        print(f"  Max diff: {np.max(np.abs(mlx_single_out - jax_single_out)):.2e}")
-
-    def test_pairformer_pair_output_matches_jax(self, ref_data):
-        """Test PairFormer pair output matches JAX AF3 reference."""
-        from alphafold3_mlx.network.pairformer import PairFormerIteration
-
-        _check_sc002_compliance(ref_data)
-        _check_params_exist(ref_data)
-
-        seq_channel = int(ref_data["seq_channel"])
-        pair_channel = int(ref_data["pair_channel"])
-        num_heads = int(ref_data["num_heads"])
-
-        module = PairFormerIteration(
-            seq_channel=seq_channel,
-            pair_channel=pair_channel,
-            num_attention_heads=num_heads,
-            attention_key_dim=None,
-            intermediate_factor=4,
-            with_single=True,
-        )
-
-        # Zero-initialize OuterProductMean if weights not in reference
-        # This makes it a no-op for backward compatibility with older references
-        if "params/pairformer/outer_product_mean/output_proj/w" not in ref_data.keys():
-            module.outer_product_mean.output_proj.weight = mx.zeros_like(
-                module.outer_product_mean.output_proj.weight
-            )
-
-        # Load all weights (same as single test)
-        tri_out_params = load_jax_params_to_dict(
-            ref_data, "params/pairformer/triangle_multiplication_outgoing/"
-        )
-        load_triangle_mult_weights(module.triangle_mult_outgoing, tri_out_params)
-
-        tri_in_params = load_jax_params_to_dict(
-            ref_data, "params/pairformer/triangle_multiplication_incoming/"
-        )
-        load_triangle_mult_weights(module.triangle_mult_incoming, tri_in_params)
-
-        pair_attn1_params = load_jax_params_to_dict(
-            ref_data, "params/pairformer/pair_attention1/"
-        )
-        load_grid_attention_weights(module.pair_attention_row, pair_attn1_params)
-
-        pair_attn2_params = load_jax_params_to_dict(
-            ref_data, "params/pairformer/pair_attention2/"
-        )
-        load_grid_attention_weights(module.pair_attention_col, pair_attn2_params)
-
-        pair_trans_params = load_jax_params_to_dict(
-            ref_data, "params/pairformer/pair_transition/"
-        )
-        load_transition_weights(module.pair_transition, pair_trans_params)
-
-        if "params/pairformer/single_pair_logits_norm/scale" in ref_data.keys():
-            module.pair_logits_norm.scale = mx.array(
-                ref_data["params/pairformer/single_pair_logits_norm/scale"]
-            )
-        if "params/pairformer/single_pair_logits_norm/offset" in ref_data.keys():
-            module.pair_logits_norm.offset = mx.array(
-                ref_data["params/pairformer/single_pair_logits_norm/offset"]
-            )
-        if "params/pairformer/single_pair_logits_projection/weights" in ref_data.keys():
-            module.pair_logits_proj.weight = mx.array(
-                ref_data["params/pairformer/single_pair_logits_projection/weights"]
-            )
-        elif "params/pairformer/single_pair_logits_projection/w" in ref_data.keys():
-            module.pair_logits_proj.weight = mx.array(
-                ref_data["params/pairformer/single_pair_logits_projection/w"]
-            )
-
-        single_attn_params = load_jax_params_to_dict(
-            ref_data, "params/pairformer/single_attention_"
-        )
-        load_single_attention_weights(module.single_attention, single_attn_params)
-
-        single_trans_params = load_jax_params_to_dict(
-            ref_data, "params/pairformer/single_transition/"
-        )
-        load_transition_weights(module.single_transition, single_trans_params)
-
-        # Load inputs
-        single_input = mx.array(ref_data["single_input"])[None, ...]
-        pair_input = mx.array(ref_data["pair_input"])[None, ...]
-        seq_mask = mx.array(ref_data["seq_mask"])[None, ...]
-        pair_mask = mx.array(ref_data["pair_mask"])[None, ...]
-
-        # Run forward
-        _, pair_out = module(single_input, pair_input, seq_mask, pair_mask)
-        mx.eval(pair_out)
-
-        # Compare - squeeze batch dimension from both
+        # Compare pair output
         jax_pair_out = np.array(ref_data["pair_output"])
         if jax_pair_out.ndim == 4 and jax_pair_out.shape[0] == 1:
             jax_pair_out = jax_pair_out[0]
-        mlx_pair_out = np.array(pair_out)[0]
 
         np.testing.assert_allclose(
             mlx_pair_out,
@@ -1079,8 +982,9 @@ class TestPairFormerJAXAF3Parity:
             err_msg="FAILED: PairFormer pair output differs from JAX reference",
         )
 
-        print(f"\n=== PairFormer Pair Output Parity PASSED ===")
-        print(f"  Max diff: {np.max(np.abs(mlx_pair_out - jax_pair_out)):.2e}")
+        print(f"\n=== PairFormer Parity PASSED ===")
+        print(f"  Single max diff: {np.max(np.abs(mlx_single_out - jax_single_out)):.2e}")
+        print(f"  Pair max diff: {np.max(np.abs(mlx_pair_out - jax_pair_out)):.2e}")
 
     def test_pairformer_has_params_keys(self, ref_data):
         """Test that reference file has params/* keys (requirement)."""
@@ -1100,8 +1004,10 @@ class TestEvoformerJAXAF3Parity:
     def ref_data(self) -> np.lib.npyio.NpzFile:
         """Load Evoformer reference data."""
         ref_path = JAX_AF3_REF_DIR / "evoformer_ref.npz"
-        _check_ref_file(ref_path, "evoformer_ref.npz")
-        return np.load(ref_path, allow_pickle=True)
+        return load_golden_data(
+            str(ref_path),
+            "python scripts/generate_jax_af3_references.py",
+        )
 
     def test_evoformer_has_params_keys(self, ref_data):
         """Test that Evoformer reference has params/* keys (requirement)."""
@@ -1211,7 +1117,7 @@ class TestEvoformerJAXAF3Parity:
             )
 
             # Zero-initialize OuterProductMean for backward compatibility
-            # with older references (makes it a no-op)
+            # with pre-references (makes it a no-op)
             layer.outer_product_mean.output_proj.weight = mx.zeros_like(
                 layer.outer_product_mean.output_proj.weight
             )
@@ -1357,8 +1263,10 @@ class TestDiffusionStepJAXAF3Parity:
     def ref_data(self) -> np.lib.npyio.NpzFile:
         """Load diffusion step reference data."""
         ref_path = JAX_AF3_REF_DIR / "diffusion_step_ref.npz"
-        _check_ref_file(ref_path, "diffusion_step_ref.npz")
-        return np.load(ref_path, allow_pickle=True)
+        return load_golden_data(
+            str(ref_path),
+            "python scripts/generate_jax_af3_references.py",
+        )
 
     def test_diffusion_has_params_keys(self, ref_data):
         """Test that diffusion reference has params/* keys (requirement)."""
@@ -1478,8 +1386,10 @@ class TestConfidenceHeadJAXAF3Parity:
     def ref_data(self) -> np.lib.npyio.NpzFile:
         """Load confidence head reference data."""
         ref_path = JAX_AF3_REF_DIR / "confidence_ref.npz"
-        _check_ref_file(ref_path, "confidence_ref.npz")
-        return np.load(ref_path, allow_pickle=True)
+        return load_golden_data(
+            str(ref_path),
+            "python scripts/generate_jax_af3_references.py",
+        )
 
     def test_confidence_has_params_keys(self, ref_data):
         """Test that confidence reference has params/* keys (requirement)."""
@@ -1553,13 +1463,13 @@ class TestConfidenceHeadJAXAF3Parity:
         pde_err = rel_error(np.array(result.pde)[0], jax_pde)
 
         assert plddt_err < TOLERANCES["confidence"]["relative_error"], (
-            f"FAILED: pLDDT relative error {plddt_err:.4f} exceeds tolerance"
+            f"FAILED: pLDDT relative error{plddt_err:.4f} exceeds tolerance"
         )
         assert pae_err < TOLERANCES["confidence"]["relative_error"], (
-            f"FAILED: PAE relative error {pae_err:.4f} exceeds tolerance"
+            f"FAILED: PAE relative error{pae_err:.4f} exceeds tolerance"
         )
         assert pde_err < TOLERANCES["confidence"]["relative_error"], (
-            f"FAILED: PDE relative error {pde_err:.4f} exceeds tolerance"
+            f"FAILED: PDE relative error{pde_err:.4f} exceeds tolerance"
         )
 
         print(f"\n=== ConfidenceHead Numerical Parity PASSED ===")
@@ -1579,8 +1489,10 @@ class TestSC003EndToEndRMSD:
     def ref_data(self) -> np.lib.npyio.NpzFile:
         """Load end-to-end reference data."""
         ref_path = JAX_AF3_REF_DIR / "end_to_end_ref.npz"
-        _check_ref_file(ref_path, "end_to_end_ref.npz")
-        return np.load(ref_path, allow_pickle=True)
+        return load_golden_data(
+            str(ref_path),
+            "python scripts/generate_jax_af3_references.py",
+        )
 
     def test_end_to_end_has_params_keys(self, ref_data):
         """Test that end-to-end reference has params/* keys (requirement)."""
@@ -1722,7 +1634,7 @@ class TestSC003EndToEndRMSD:
         rmsd = np.sqrt(np.mean(np.sum(diff ** 2, axis=-1)))
 
         assert rmsd < SC003_RMSD_TOLERANCE, (
-            f"FAILED: RMSD {rmsd:.4f}Å exceeds {SC003_RMSD_TOLERANCE:.2f}Å"
+            f"FAILED: RMSD{rmsd:.4f}Å exceeds {SC003_RMSD_TOLERANCE:.2f}Å"
         )
 
         print(f"\n=== End-to-End RMSD Parity PASSED ===")

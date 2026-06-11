@@ -3,15 +3,7 @@
 import { Check, Circle, Loader2 } from "lucide-react";
 import { STAGE_LABELS } from "@/lib/constants";
 
-const STAGES = [
-  "weight_loading",
-  "data_pipeline",
-  "feature_preparation",
-  "recycling",
-  "diffusion",
-  "confidence",
-  "output_writing",
-];
+const STAGES = Object.keys(STAGE_LABELS);
 
 interface Props {
   currentStage: string | null;

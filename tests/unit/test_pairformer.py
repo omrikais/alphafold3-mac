@@ -196,13 +196,8 @@ class TestPairFormerGoldenValidation:
 
     @pytest.fixture
     def golden_data(self):
-        """Load golden reference data if available."""
-        from pathlib import Path
-        golden_path = Path(self.GOLDEN_FILE)
-        if not golden_path.exists():
-            pytest.skip(f"Golden reference not found: {golden_path}. "
-                       "Run: python scripts/generate_model_reference_outputs.py")
-        return np.load(golden_path)
+        from tests.unit.conftest import load_golden_data
+        return load_golden_data(self.GOLDEN_FILE)
 
     def test_golden_comparison(self, golden_data):
         """Compare PairFormer output against golden reference.

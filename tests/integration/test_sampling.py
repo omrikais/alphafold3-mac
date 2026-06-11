@@ -13,38 +13,9 @@ import numpy as np
 import mlx.core as mx
 
 from alphafold3_mlx.model import Model
-from alphafold3_mlx.core import ModelConfig, FeatureBatch
+from alphafold3_mlx.core import ModelConfig
 from alphafold3_mlx.core.config import EvoformerConfig, DiffusionConfig, GlobalConfig
-
-
-def compute_rmsd(coords1: np.ndarray, coords2: np.ndarray) -> float:
-    """Compute RMSD between two coordinate sets.
-
-    Args:
-        coords1: First coordinate set [N, 3].
-        coords2: Second coordinate set [N, 3].
-
-    Returns:
-        RMSD value in Angstroms.
-    """
-    diff = coords1 - coords2
-    return float(np.sqrt(np.mean(np.sum(diff ** 2, axis=-1))))
-
-
-def create_test_batch(num_residues: int = 15, seed: int = 42) -> FeatureBatch:
-    """Create minimal feature batch for testing."""
-    np.random.seed(seed)
-
-    feature_dict = {
-        "aatype": np.random.randint(0, 20, size=num_residues).astype(np.int32),
-        "token_mask": np.ones(num_residues, dtype=np.float32),
-        "residue_index": np.arange(num_residues, dtype=np.int32),
-        "asym_id": np.zeros(num_residues, dtype=np.int32),
-        "entity_id": np.zeros(num_residues, dtype=np.int32),
-        "sym_id": np.zeros(num_residues, dtype=np.int32),
-    }
-
-    return FeatureBatch.from_numpy(feature_dict)
+from tests.integration.conftest import compute_rmsd, create_test_batch
 
 
 class TestSampleDiversity:

@@ -15,6 +15,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import type { FormEntity } from "@/lib/types";
 import { ENTITY_TYPE_LABELS } from "@/lib/constants";
+import { entitiesToSequences } from "@/lib/entities";
+import { timeAgo } from "@/lib/utils";
 import { checkCache } from "@/lib/api";
 import { Database, Loader2 } from "lucide-react";
 
@@ -90,54 +92,6 @@ function cacheReducer(state: CacheState, action: CacheAction): CacheState {
     default:
       return state;
   }
-}
-
-function entitiesToSequences(entities: FormEntity[]): Record<string, unknown>[] {
-  return entities.map((entity) => {
-    switch (entity.type) {
-      case "proteinChain": {
-        const pc: Record<string, unknown> = {
-          sequence: entity.sequence,
-          count: entity.copies,
-        };
-        if (entity.modifications?.length) {
-          pc.modifications = entity.modifications.map((m) => ({
-            ptmType: m.type,
-            ptmPosition: m.position,
-          }));
-        }
-        return { proteinChain: pc };
-      }
-      case "rnaSequence":
-        return { rnaSequence: { sequence: entity.sequence, count: entity.copies } };
-      case "dnaSequence":
-        return { dnaSequence: { sequence: entity.sequence, count: entity.copies } };
-      case "ligand":
-        return {
-          ligand: {
-            ...(entity.smiles
-              ? { smiles: entity.smiles }
-              : { ligand: `CCD_${entity.ccdCode}` }),
-            count: entity.copies,
-          },
-        };
-      case "ion":
-        return { ion: { ion: entity.ccdCode || "MG", count: entity.copies } };
-      default:
-        return {};
-    }
-  });
-}
-
-function timeAgo(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
 }
 
 export function PreviewModal({

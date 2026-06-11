@@ -270,7 +270,7 @@ class TestTheoreticalMinimum:
             dtype="float32",
         )
 
-        # Updated formula:
+        # Updated formula (per ):
         # Q + K + V + output: 4 * batch * heads * seq * head_dim * bytes
         # Logits: batch * heads * seq_q * seq_k * bytes
         # Base tensors = 4 * 2 * 8 * 128 * 32 * 4 = 1048576 bytes
@@ -304,7 +304,7 @@ class TestTheoreticalMinimum:
     def test_theoretical_minimum_float16(self):
         """Theoretical minimum uses float32 regardless of input dtype.
 
-        The policy requires float32 internal computation for numerical stability,
+        requires float32 internal computation for numerical stability,
         so the memory baseline must reflect actual float32 allocations even
         when inputs are float16/bfloat16.
         """

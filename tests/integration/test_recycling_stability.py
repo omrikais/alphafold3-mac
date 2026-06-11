@@ -12,7 +12,7 @@ import numpy as np
 import mlx.core as mx
 
 from alphafold3_mlx.model import Model
-from alphafold3_mlx.core import ModelConfig, FeatureBatch
+from alphafold3_mlx.core import ModelConfig
 from alphafold3_mlx.core.config import EvoformerConfig, DiffusionConfig, GlobalConfig
 from alphafold3_mlx.model.recycling import (
     RecyclingState,
@@ -20,22 +20,7 @@ from alphafold3_mlx.model.recycling import (
     run_recycling_loop,
     check_convergence,
 )
-
-
-def create_test_batch(num_residues: int = 10, seed: int = 42) -> FeatureBatch:
-    """Create minimal feature batch for testing."""
-    np.random.seed(seed)
-
-    feature_dict = {
-        "aatype": np.random.randint(0, 20, size=num_residues).astype(np.int32),
-        "token_mask": np.ones(num_residues, dtype=np.float32),
-        "residue_index": np.arange(num_residues, dtype=np.int32),
-        "asym_id": np.zeros(num_residues, dtype=np.int32),
-        "entity_id": np.zeros(num_residues, dtype=np.int32),
-        "sym_id": np.zeros(num_residues, dtype=np.int32),
-    }
-
-    return FeatureBatch.from_numpy(feature_dict)
+from tests.integration.conftest import create_test_batch
 
 
 class TestRecyclingState:
@@ -204,7 +189,9 @@ class TestRecyclingLoop:
             assert diff >= 0
 
     def test_recycling_ten_iterations_decreasing(self, simple_evoformer):
-        """Test that 10 iterations show decreasing differences. requirement: Differences should generally decrease across iterations,
+        """Test that 10 iterations show decreasing differences.
+
+        requirement: Differences should generally decrease across iterations,
         indicating convergence to a stable representation.
         """
         batch_size = 1
@@ -229,7 +216,7 @@ class TestRecyclingLoop:
             initial_pair=initial_pair,
             residue_index=residue_index,
             asym_id=asym_id,
-            num_recycles=9, # 10 total iterations
+            num_recycles=9,  # 10 total iterations
             seq_mask=seq_mask,
             pair_mask=pair_mask,
             track_convergence=True,
@@ -241,7 +228,7 @@ class TestRecyclingLoop:
         # Print differences for debugging
         print("\nRecycling differences across 10 iterations:")
         for i, diff in enumerate(state.differences):
-            print(f" Iteration {i}: {diff:.6e}")
+            print(f"  Iteration {i}: {diff:.6e}")
 
         # Check general trend is decreasing
         # Allow some tolerance - not strictly monotonic but overall decreasing
@@ -250,8 +237,8 @@ class TestRecyclingLoop:
 
         # Second half should have smaller average differences
         # (This is a soft check - neural network behavior can vary)
-        print(f"\n First half avg: {first_half_avg:.6e}")
-        print(f" Second half avg: {second_half_avg:.6e}")
+        print(f"\n  First half avg: {first_half_avg:.6e}")
+        print(f"  Second half avg: {second_half_avg:.6e}")
 
     def test_no_nan_after_recycling(self, simple_evoformer):
         """Test that recycling produces valid (non-NaN) outputs."""
@@ -302,10 +289,10 @@ class TestRecyclingWithModel:
             diffusion=DiffusionConfig(
                 num_steps=5,
                 num_samples=1,
-                num_transformer_blocks=4, # Must be divisible by super_block_size=4
+                num_transformer_blocks=4,  # Must be divisible by super_block_size=4
             ),
             global_config=GlobalConfig(use_compile=False),
-            num_recycles=4, # 5 total iterations
+            num_recycles=4,  # 5 total iterations
         )
         return Model(config)
 

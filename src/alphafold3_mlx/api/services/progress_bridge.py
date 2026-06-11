@@ -7,7 +7,6 @@ messages to a ProgressHub, which fans out to connected WebSocket clients.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from typing import Any
 
@@ -29,6 +28,14 @@ STAGE_WEIGHTS: dict[str, float] = {
     "ranking": 0.02,
     "startup": 0.03,
 }
+
+# Pre-computed base offsets to avoid recomputing sums on every step callback.
+_BASE_BEFORE_RECYCLING = sum(
+    STAGE_WEIGHTS[s] for s in ("weight_loading", "data_pipeline", "feature_preparation", "startup")
+) * 100
+_BASE_BEFORE_DIFFUSION = _BASE_BEFORE_RECYCLING + STAGE_WEIGHTS["recycling"] * 100
+_DIFFUSION_RANGE = STAGE_WEIGHTS["diffusion"] * 100
+_RECYCLING_RANGE = STAGE_WEIGHTS["recycling"] * 100
 
 
 class ProgressHub:
@@ -66,6 +73,10 @@ class ProgressHub:
             if not self._subscribers[job_id]:
                 del self._subscribers[job_id]
 
+    def has_subscribers(self, job_id: str) -> bool:
+        """Check if any WebSocket clients are subscribed to this job."""
+        return bool(self._subscribers.get(job_id))
+
     def publish(self, job_id: str, message: WSMessage) -> None:
         """Publish a progress message to all subscribers of a job.
 
@@ -74,7 +85,7 @@ class ProgressHub:
         with subscribe/unsubscribe on asyncio.Queue (which is not
         thread-safe).
         """
-        if job_id not in self._subscribers:
+        if not self.has_subscribers(job_id):
             return
         msg_str = message.model_dump_json()
         if self._loop is not None and self._loop.is_running():
@@ -165,45 +176,36 @@ class APIProgressReporter(ProgressReporter):
 
     def on_diffusion_step(self, step: int, total: int) -> None:
         super().on_diffusion_step(step, total)
-        # Diffusion progress: interpolate within the diffusion stage weight
-        base = sum(
-            STAGE_WEIGHTS[s]
-            for s in ("weight_loading", "data_pipeline", "feature_preparation", "recycling", "startup")
-        ) * 100
-        diffusion_range = STAGE_WEIGHTS["diffusion"] * 100
-        self._percent = base + diffusion_range * (step + 1) / max(total, 1)
+        self._percent = _BASE_BEFORE_DIFFUSION + _DIFFUSION_RANGE * (step + 1) / max(total, 1)
         # Persist every 10 steps to avoid DB thrashing
         if step % 10 == 0 or step + 1 == total:
             self._persist("diffusion")
-        self._hub.publish(
-            self._job_id,
-            WSMessage(
-                type="progress",
-                stage="diffusion",
-                diffusion_step=step + 1,
-                diffusion_total=total,
-                percent_complete=round(self._percent, 1),
-            ),
-        )
+        if self._hub.has_subscribers(self._job_id):
+            self._hub.publish(
+                self._job_id,
+                WSMessage(
+                    type="progress",
+                    stage="diffusion",
+                    diffusion_step=step + 1,
+                    diffusion_total=total,
+                    percent_complete=round(self._percent, 1),
+                ),
+            )
 
     def on_recycling_iteration(self, iteration: int, total: int) -> None:
         super().on_recycling_iteration(iteration, total)
-        base = sum(
-            STAGE_WEIGHTS[s]
-            for s in ("weight_loading", "data_pipeline", "feature_preparation", "startup")
-        ) * 100
-        recycling_range = STAGE_WEIGHTS["recycling"] * 100
-        self._percent = base + recycling_range * (iteration + 1) / max(total, 1)
-        self._hub.publish(
-            self._job_id,
-            WSMessage(
-                type="progress",
-                stage="recycling",
-                recycling_iteration=iteration + 1,
-                recycling_total=total,
-                percent_complete=round(self._percent, 1),
-            ),
-        )
+        self._percent = _BASE_BEFORE_RECYCLING + _RECYCLING_RANGE * (iteration + 1) / max(total, 1)
+        if self._hub.has_subscribers(self._job_id):
+            self._hub.publish(
+                self._job_id,
+                WSMessage(
+                    type="progress",
+                    stage="recycling",
+                    recycling_iteration=iteration + 1,
+                    recycling_total=total,
+                    percent_complete=round(self._percent, 1),
+                ),
+            )
 
     def on_complete(self) -> None:
         super().on_complete()

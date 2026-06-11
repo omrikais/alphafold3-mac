@@ -1,6 +1,6 @@
 """Unit tests for GatedLinearUnit module.
 
-These tests validate the GatedLinearUnit implementation for.
+These tests validate the GatedLinearUnit implementation for .
 Tests are written first (TDD) to define expected behavior.
 """
 

@@ -92,6 +92,11 @@ export interface RestraintSatisfaction {
   repulsive?: RepulsiveSatisfaction[];
 }
 
+/** Total number of restraints across all types. */
+export function countRestraints(r: RestraintConfig): number {
+  return (r.distance?.length ?? 0) + (r.contact?.length ?? 0) + (r.repulsive?.length ?? 0);
+}
+
 // ── Defaults for form UI ───────────────────────────────────────────────────
 
 export const RESTRAINT_DEFAULTS = {

@@ -10,6 +10,7 @@ import mlx.nn as nn
 
 from alphafold3_mlx.atom_layout import convert as layout_convert, GatherInfo
 from alphafold3_mlx.modules import Linear, LayerNorm
+from alphafold3_mlx.network.featurization import _one_hot, _mask_mean
 from alphafold3_mlx.network.diffusion_transformer import (
     CrossAttTransformer,
     CrossAttTransformerConfig,
@@ -18,12 +19,6 @@ from alphafold3_mlx.network.diffusion_transformer import (
 if TYPE_CHECKING:
     from alphafold3_mlx.core.config import DiffusionConfig, GlobalConfig
     from alphafold3_mlx.feat_batch import Batch
-
-
-def _mask_mean(mask: mx.array, value: mx.array, axis, keepdims, eps=1e-6) -> mx.array:
-    numerator = mx.sum(mask * value, axis=axis, keepdims=keepdims)
-    denom = mx.sum(mask, axis=axis, keepdims=keepdims)
-    return numerator / (denom + eps)
 
 
 @dataclass(frozen=True)
@@ -425,5 +420,3 @@ class AtomCrossAttDecoder(nn.Module):
         return position_update
 
 
-def _one_hot(x: mx.array, num_classes: int) -> mx.array:
-    return (x[..., None] == mx.arange(num_classes)).astype(mx.float32)

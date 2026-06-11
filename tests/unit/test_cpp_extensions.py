@@ -7,7 +7,6 @@ function correctly on macOS ARM64.
 import platform
 import sys
 
-import numpy as np
 import pytest
 
 
@@ -23,6 +22,22 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+_CPP_SUBMODULES = [
+    "cif_dict",
+    "fasta_iterator",
+    "msa_conversion",
+    "mmcif_layout",
+    "mmcif_struct_conn",
+    "membership",
+    "mmcif_utils",
+    "aggregation",
+    "string_array",
+    "mmcif_atom_site",
+    "mkdssp",
+    "msa_profile",
+]
+
+
 class TestCppExtensionImport:
     """Tests that C++ extensions can be imported successfully."""
 
@@ -32,77 +47,13 @@ class TestCppExtensionImport:
 
         assert cpp is not None
 
-    def test_cif_dict_submodule(self):
-        """Test cif_dict submodule import."""
-        from alphafold3.cpp import cif_dict
+    @pytest.mark.parametrize("submodule", _CPP_SUBMODULES)
+    def test_submodule_import(self, submodule):
+        """Test that each C++ submodule can be imported."""
+        import importlib
 
-        assert cif_dict is not None
-
-    def test_fasta_iterator_submodule(self):
-        """Test fasta_iterator submodule import."""
-        from alphafold3.cpp import fasta_iterator
-
-        assert fasta_iterator is not None
-
-    def test_msa_conversion_submodule(self):
-        """Test msa_conversion submodule import."""
-        from alphafold3.cpp import msa_conversion
-
-        assert msa_conversion is not None
-
-    def test_mmcif_layout_submodule(self):
-        """Test mmcif_layout submodule import."""
-        from alphafold3.cpp import mmcif_layout
-
-        assert mmcif_layout is not None
-
-    def test_mmcif_struct_conn_submodule(self):
-        """Test mmcif_struct_conn submodule import."""
-        from alphafold3.cpp import mmcif_struct_conn
-
-        assert mmcif_struct_conn is not None
-
-    def test_membership_submodule(self):
-        """Test membership submodule import."""
-        from alphafold3.cpp import membership
-
-        assert membership is not None
-
-    def test_mmcif_utils_submodule(self):
-        """Test mmcif_utils submodule import."""
-        from alphafold3.cpp import mmcif_utils
-
-        assert mmcif_utils is not None
-
-    def test_aggregation_submodule(self):
-        """Test aggregation submodule import."""
-        from alphafold3.cpp import aggregation
-
-        assert aggregation is not None
-
-    def test_string_array_submodule(self):
-        """Test string_array submodule import."""
-        from alphafold3.cpp import string_array
-
-        assert string_array is not None
-
-    def test_mmcif_atom_site_submodule(self):
-        """Test mmcif_atom_site submodule import."""
-        from alphafold3.cpp import mmcif_atom_site
-
-        assert mmcif_atom_site is not None
-
-    def test_mkdssp_submodule(self):
-        """Test mkdssp submodule import."""
-        from alphafold3.cpp import mkdssp
-
-        assert mkdssp is not None
-
-    def test_msa_profile_submodule(self):
-        """Test msa_profile submodule import."""
-        from alphafold3.cpp import msa_profile
-
-        assert msa_profile is not None
+        mod = importlib.import_module(f"alphafold3.cpp.{submodule}")
+        assert mod is not None
 
 
 class TestCppExtensionFunctionality:
@@ -141,20 +92,5 @@ class TestCppModuleAttributes:
         """Test that cpp module has all expected submodules."""
         from alphafold3 import cpp
 
-        expected_submodules = [
-            "cif_dict",
-            "fasta_iterator",
-            "msa_conversion",
-            "mmcif_layout",
-            "mmcif_struct_conn",
-            "membership",
-            "mmcif_utils",
-            "aggregation",
-            "string_array",
-            "mmcif_atom_site",
-            "mkdssp",
-            "msa_profile",
-        ]
-
-        for submodule in expected_submodules:
+        for submodule in _CPP_SUBMODULES:
             assert hasattr(cpp, submodule), f"Missing submodule: {submodule}"

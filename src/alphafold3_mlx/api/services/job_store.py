@@ -130,11 +130,13 @@ class JobStore:
             return None
         return self._row_to_detail(row)
 
+    _SUMMARY_COLS = "id, name, status, created_at, updated_at, num_residues, num_chains, error_message, progress"
+
     def get_job_summary(self, job_id: str) -> JobSummary | None:
         """Get job summary."""
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT * FROM jobs WHERE id = ?", (job_id,)
+                f"SELECT {self._SUMMARY_COLS} FROM jobs WHERE id = ?", (job_id,)
             ).fetchone()
         if row is None:
             return None
@@ -167,7 +169,7 @@ class JobStore:
 
             offset = (page - 1) * page_size
             rows = conn.execute(
-                f"SELECT * FROM jobs{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                f"SELECT {self._SUMMARY_COLS} FROM jobs{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 params + [page_size, offset],
             ).fetchall()
 
@@ -262,10 +264,9 @@ class JobStore:
     def delete_job(self, job_id: str) -> bool:
         """Delete a job and its output files. Returns True if found."""
         with self._connect() as conn:
-            row = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_id,)).fetchone()
-            if row is None:
+            cursor = conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+            if cursor.rowcount == 0:
                 return False
-            conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
 
         # Clean up output directory
         output_dir = self._jobs_dir / job_id

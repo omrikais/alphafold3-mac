@@ -59,7 +59,7 @@ MAX_ERROR_BIN: float = 31.0  # Maximum error bin value in Angstroms
 DEFAULT_NUM_RECYCLES: int = 10  # Default number of recycling iterations
 
 # Memory management
-DIFFUSION_EVAL_INTERVAL: int = 10 # mx.eval every N diffusion steps
+DIFFUSION_EVAL_INTERVAL: int = 10  # mx.eval() every N diffusion steps
 
 # Physical constants for structure validation
 BOND_LENGTH_TOLERANCE: float = 0.05  # Angstroms

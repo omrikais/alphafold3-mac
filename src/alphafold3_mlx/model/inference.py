@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 import mlx.core as mx
 
-from alphafold3_mlx.core.validation import check_nan, NaNCheckpoint, get_available_memory_gb
+from alphafold3_mlx.core.validation import check_nan, NaNCheckpoint
 
 if TYPE_CHECKING:
     from typing import Callable
@@ -78,7 +78,7 @@ def run_inference(
         confidence_callback: Optional callback called with "start" or "end"
             to signal confidence computation phase.
         guidance_fn: Optional restraint guidance function built by
-            build_guidance_fn. Passed through to Model.__call__.
+            build_guidance_fn. Passed through to Model.__call__().
 
     Returns:
         Tuple of (ModelResult, InferenceStats).

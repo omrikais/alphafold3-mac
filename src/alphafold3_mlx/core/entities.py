@@ -11,12 +11,8 @@ This module defines the core data structures that flow through the model:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import mlx.core as mx
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass(frozen=True)

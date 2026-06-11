@@ -1,7 +1,7 @@
 """Diffusion loop stability tests.
 
 Verifies that memory usage is stable (not monotonically increasing)
-during the 200-step diffusion loop.
+during the 200-step diffusion loop as required by .
 """
 
 from __future__ import annotations
@@ -197,7 +197,7 @@ class TestDiffusionMemoryStability:
     def test_diffusion_eval_interval(self, diffusion_head):
         """Test that mx.eval is called at appropriate intervals.
 
-        mx.eval must be called every 10 steps to prevent
+        mx.eval() must be called every 10 steps to prevent
         graph explosion.
         """
         # This is a structural test - verify the diffusion head has

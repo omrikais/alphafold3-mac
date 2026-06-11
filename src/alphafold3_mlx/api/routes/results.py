@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import logging
 import subprocess
@@ -14,22 +13,17 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from alphafold3_mlx.api.models import ConfidenceResult, JobStatus, SampleConfidence
+from alphafold3_mlx.api.models import ConfidenceResult, JobDetail, JobStatus, SampleConfidence
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/jobs", tags=["results"])
 
 
-def _first_not_none(*values):
-    """Return the first value that is not None."""
-    for v in values:
-        if v is not None:
-            return v
-    return None
+def _require_completed_job(store, job_id: str) -> tuple[JobDetail, Path]:
+    """Validate that a job exists and is completed, returning (job, output_dir).
 
-
-def _load_confidence_json(store, job_id: str) -> dict:
-    """Load and return the raw confidence_scores.json for a completed job."""
+    Raises HTTPException 404 if not found, 400 if not completed.
+    """
     job = store.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
@@ -38,8 +32,13 @@ def _load_confidence_json(store, job_id: str) -> dict:
             status_code=400,
             detail=f"Job {job_id} is not completed (status: {job.status.value})",
         )
+    return job, store.job_output_dir(job_id)
 
-    output_dir = store.job_output_dir(job_id)
+
+def _load_confidence_json(store, job_id: str) -> dict:
+    """Load and return the raw confidence_scores.json for a completed job."""
+    _job, output_dir = _require_completed_job(store, job_id)
+
     confidence_file = output_dir / "confidence_scores.json"
     if not confidence_file.exists():
         raise HTTPException(status_code=404, detail="Confidence scores not found")
@@ -80,9 +79,9 @@ async def get_results(job_id: str, request: Request) -> ConfidenceResult:
     best = samples_dict.get(best_key, {})
 
     return ConfidenceResult(
-        ptm=_first_not_none(best.get("ptm"), data.get("ptm"), data.get("pTM")),
-        iptm=_first_not_none(best.get("iptm"), data.get("iptm"), data.get("ipTM")),
-        mean_plddt=_first_not_none(best.get("mean_plddt"), data.get("mean_plddt")),
+        ptm=next((v for v in (best.get("ptm"), data.get("ptm"), data.get("pTM")) if v is not None), None),
+        iptm=next((v for v in (best.get("iptm"), data.get("iptm"), data.get("ipTM")) if v is not None), None),
+        mean_plddt=next((v for v in (best.get("mean_plddt"), data.get("mean_plddt")) if v is not None), None),
         ranking_metric=data.get("ranking_metric"),
         num_samples=data.get("num_samples", len(sample_list)),
         samples=sample_list,
@@ -126,16 +125,8 @@ async def get_sample_confidence(
 async def get_confidence_json(job_id: str, request: Request) -> FileResponse:
     """Download the raw confidence_scores.json file."""
     store = request.app.state.job_store
-    job = store.get_job(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-    if job.status != JobStatus.COMPLETED:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Job {job_id} is not completed (status: {job.status.value})",
-        )
+    job, output_dir = _require_completed_job(store, job_id)
 
-    output_dir = store.job_output_dir(job_id)
     confidence_file = output_dir / "confidence_scores.json"
     if not confidence_file.exists():
         raise HTTPException(status_code=404, detail="Confidence scores not found")
@@ -151,16 +142,8 @@ async def get_confidence_json(job_id: str, request: Request) -> FileResponse:
 async def download_all(job_id: str, request: Request) -> StreamingResponse:
     """Download a ZIP archive of all output files."""
     store = request.app.state.job_store
-    job = store.get_job(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-    if job.status != JobStatus.COMPLETED:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Job {job_id} is not completed (status: {job.status.value})",
-        )
+    job, output_dir = _require_completed_job(store, job_id)
 
-    output_dir = store.job_output_dir(job_id)
     if not output_dir.exists():
         raise HTTPException(status_code=404, detail="Output directory not found")
 
@@ -209,16 +192,7 @@ async def open_directory(job_id: str, request: Request) -> JSONResponse:
 async def get_structure(job_id: str, rank: int, request: Request) -> FileResponse:
     """Download mmCIF structure file by rank."""
     store = request.app.state.job_store
-    job = store.get_job(job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
-    if job.status != JobStatus.COMPLETED:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Job {job_id} is not completed (status: {job.status.value})",
-        )
-
-    output_dir = store.job_output_dir(job_id)
+    job, output_dir = _require_completed_job(store, job_id)
     structure_file = output_dir / f"structure_rank_{rank}.cif"
     if not structure_file.exists():
         raise HTTPException(

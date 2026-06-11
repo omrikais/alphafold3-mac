@@ -5,7 +5,7 @@
 # before allowing merge to main branch.
 #
 # Usage:
-# ./scripts/run_validation_tests.sh # Run validation subset
+#   ./scripts/run_validation_tests.sh                 # Run validation subset
 #   ./scripts/run_validation_tests.sh --quick         # Run quick subset (unit only)
 #   ./scripts/run_validation_tests.sh --report        # Generate HTML report
 #   ./scripts/run_validation_tests.sh --external-deps # Run external deps tests (optional)
@@ -85,7 +85,7 @@ fi
 # Set Python path
 export PYTHONPATH="${PROJECT_ROOT}/src:${PYTHONPATH:-}"
 
-# Build pytest base command (The policy requires -v)
+# Build pytest base command (requires -v)
 PYTEST_BASE=(python -m pytest -v)
 
 if [[ "$VERBOSE" == "true" ]]; then
@@ -159,7 +159,7 @@ run_pytest() {
             echo -e "${RED}=============================================="
             echo "VALIDATION FAILED (${label})"
             echo "=============================================="
-            echo "The policy forbids skipped or deselected tests in this run."
+            echo "This run forbids skipped or deselected tests."
             echo -e "===============================================${NC}"
             exit 1
         fi
@@ -172,7 +172,7 @@ run_pytest() {
     echo -e "===============================================${NC}"
 }
 
-# validation run
+# Validation run
 if [[ "$QUICK_MODE" == "true" ]]; then
     run_pytest "Quick (unit only)" "true" \
         "${PYTEST_BASE[@]}" \

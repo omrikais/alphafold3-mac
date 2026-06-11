@@ -1,5 +1,7 @@
 /** TypeScript interfaces matching the API schemas. */
 
+import type { RestraintSatisfaction } from "./restraints";
+
 export type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
 export type EntityType = "proteinChain" | "rnaSequence" | "dnaSequence" | "ligand" | "ion";
@@ -54,44 +56,6 @@ export interface SystemStatus {
   active_job_id: string | null;
   version: string;
   run_data_pipeline: boolean;
-}
-
-export interface DistanceSatisfaction {
-  chain_i: string;
-  residue_i: number;
-  atom_i: string;
-  chain_j: string;
-  residue_j: number;
-  atom_j: string;
-  target_distance: number;
-  actual_distance: number;
-  satisfied: boolean;
-}
-
-export interface ContactSatisfaction {
-  chain_i: string;
-  residue_i: number;
-  closest_candidate_chain: string;
-  closest_candidate_residue: number;
-  threshold: number;
-  actual_distance: number;
-  satisfied: boolean;
-}
-
-export interface RepulsiveSatisfaction {
-  chain_i: string;
-  residue_i: number;
-  chain_j: string;
-  residue_j: number;
-  min_distance: number;
-  actual_distance: number;
-  satisfied: boolean;
-}
-
-export interface RestraintSatisfaction {
-  distance?: DistanceSatisfaction[];
-  contact?: ContactSatisfaction[];
-  repulsive?: RepulsiveSatisfaction[];
 }
 
 export interface SampleConfidence {

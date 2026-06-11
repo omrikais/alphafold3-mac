@@ -13,24 +13,9 @@ import numpy as np
 import mlx.core as mx
 
 from alphafold3_mlx.model import Model
-from alphafold3_mlx.core import ModelConfig, FeatureBatch
+from alphafold3_mlx.core import ModelConfig
 from alphafold3_mlx.core.config import EvoformerConfig, DiffusionConfig, GlobalConfig
-
-
-def create_test_batch(num_residues: int = 10, seed: int = 42) -> FeatureBatch:
-    """Create minimal feature batch for testing."""
-    np.random.seed(seed)
-
-    feature_dict = {
-        "aatype": np.random.randint(0, 20, size=num_residues).astype(np.int32),
-        "token_mask": np.ones(num_residues, dtype=np.float32),
-        "residue_index": np.arange(num_residues, dtype=np.int32),
-        "asym_id": np.zeros(num_residues, dtype=np.int32),
-        "entity_id": np.zeros(num_residues, dtype=np.int32),
-        "sym_id": np.zeros(num_residues, dtype=np.int32),
-    }
-
-    return FeatureBatch.from_numpy(feature_dict)
+from tests.integration.conftest import create_test_batch
 
 
 class TestFloat32Precision:
@@ -194,7 +179,9 @@ class TestBFloat16Precision:
 
 
 class TestBFloat16EvoformerStability:
-    """Test bfloat16 stability across Evoformer layers. requirement: bfloat16 mode must be stable across all 48 layers.
+    """Test bfloat16 stability across Evoformer layers.
+
+    requirement: bfloat16 mode must be stable across all 48 layers.
     This test uses reduced layers for faster testing.
     """
 
@@ -203,13 +190,13 @@ class TestBFloat16EvoformerStability:
         """Create model with more layers for stability testing."""
         config = ModelConfig(
             evoformer=EvoformerConfig(
-                num_pairformer_layers=8, # More layers for stability test
+                num_pairformer_layers=8,  # More layers for stability test
                 use_msa_stack=False,
             ),
             diffusion=DiffusionConfig(
                 num_steps=5,
                 num_samples=1,
-                num_transformer_blocks=4, # Must be divisible by super_block_size=4
+                num_transformer_blocks=4,  # Must be divisible by super_block_size=4
             ),
             global_config=GlobalConfig(
                 precision="bfloat16",
@@ -267,7 +254,7 @@ class TestPrecisionModeSwitching:
         """Test switching to float16 precision."""
         config = ModelConfig(
             evoformer=EvoformerConfig(num_pairformer_layers=1, use_msa_stack=False),
-            diffusion=DiffusionConfig(num_steps=3, num_samples=1, num_transformer_blocks=4), # Must be divisible by super_block_size=4
+            diffusion=DiffusionConfig(num_steps=3, num_samples=1, num_transformer_blocks=4),  # Must be divisible by super_block_size=4
             global_config=GlobalConfig(precision="float32", use_compile=False),
             num_recycles=1,
         )
@@ -282,7 +269,7 @@ class TestPrecisionModeSwitching:
         """Test switching to bfloat16 precision."""
         config = ModelConfig(
             evoformer=EvoformerConfig(num_pairformer_layers=1, use_msa_stack=False),
-            diffusion=DiffusionConfig(num_steps=3, num_samples=1, num_transformer_blocks=4), # Must be divisible by super_block_size=4
+            diffusion=DiffusionConfig(num_steps=3, num_samples=1, num_transformer_blocks=4),  # Must be divisible by super_block_size=4
             global_config=GlobalConfig(precision="float32", use_compile=False),
             num_recycles=1,
         )
@@ -295,7 +282,7 @@ class TestPrecisionModeSwitching:
         """Test that invalid precision raises error."""
         config = ModelConfig(
             evoformer=EvoformerConfig(num_pairformer_layers=1, use_msa_stack=False),
-            diffusion=DiffusionConfig(num_steps=3, num_samples=1, num_transformer_blocks=4), # Must be divisible by super_block_size=4
+            diffusion=DiffusionConfig(num_steps=3, num_samples=1, num_transformer_blocks=4),  # Must be divisible by super_block_size=4
             global_config=GlobalConfig(use_compile=False),
             num_recycles=1,
         )

@@ -175,7 +175,7 @@ def validate_platform_for_cli() -> PlatformInfo:
             "Set AF3_SKIP_PLATFORM_CHECK=1 to override."
         )
 
-    # Third check: M2/M3/M4 recommended, but M1 and Unknown are warnings
+    # Third check: M2/M3/M4 recommended, but M1 and Unknown are warnings (H-02)
     chip_family = _get_chip_family()
     if chip_family not in ("M2", "M3", "M4"):
         if chip_family == "M1":

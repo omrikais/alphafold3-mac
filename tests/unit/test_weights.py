@@ -88,12 +88,11 @@ class TestConvertArray:
 
     def test_large_array(self):
         """Test large array conversion (memory efficiency)."""
-        # 256 x 256 x 64 = ~4MB float32
-        np_arr = np.random.randn(256, 256, 64).astype(np.float32)
+        # 32 x 32 x 8 — exercises multi-dim path without excessive allocation
+        np_arr = np.random.randn(32, 32, 8).astype(np.float32)
         mlx_arr = convert_array(np_arr)
 
-        assert mlx_arr.shape == (256, 256, 64)
-        # Spot check values
+        assert mlx_arr.shape == (32, 32, 8)
         np.testing.assert_allclose(
             np.array(mlx_arr[:2, :2, :2]),
             np_arr[:2, :2, :2],

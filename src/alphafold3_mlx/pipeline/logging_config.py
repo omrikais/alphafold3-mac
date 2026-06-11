@@ -22,8 +22,7 @@ from pathlib import Path
 from typing import TextIO
 
 
-# Default format strings
-DEFAULT_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+# Format strings
 VERBOSE_FORMAT = "%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d): %(message)s"
 SIMPLE_FORMAT = "[%(levelname)s] %(message)s"
 

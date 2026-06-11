@@ -196,10 +196,10 @@ class TestFullyMaskedRows:
             q, k, v, boolean_mask=boolean_mask
         )
 
-        # The spec explicitly requires zeros for fully masked rows
+        # explicitly requires zeros for fully masked rows
         np.testing.assert_allclose(
             output, 0.0,
-            err_msg="Violation: fully masked output must be zeros"
+            err_msg="violation: fully masked output must be zeros"
         )
 
     def test_nan_weights_converted_to_zero(self):

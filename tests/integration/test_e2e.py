@@ -124,7 +124,7 @@ def compare_to_jax_reference(
             - For end_to_end: atom_positions, plddt, pae, ptm
             - For confidence: predicted_lddt, full_pae
         jax_ref_path: Path to JAX reference .npz file.
-        tolerances: Optional custom tolerances. Defaults:
+        tolerances: Optional custom tolerances. Defaults from
             - rmsd: 0.5 Angstroms
             - plddt_mae: 2 units
             - pae_mae: 1 Angstrom
@@ -138,9 +138,9 @@ def compare_to_jax_reference(
             - details: dict - additional comparison details
     """
     default_tolerances = {
-        "rmsd": 0.5, # < 0.5 Angstrom
-        "plddt_mae": 2.0, # < 2 units
-        "pae_mae": 1.0, # < 1 Angstrom
+        "rmsd": 0.5,       # < 0.5 Angstrom
+        "plddt_mae": 2.0,  # < 2 units
+        "pae_mae": 1.0,    # < 1 Angstrom
     }
     tol = {**default_tolerances, **(tolerances or {})}
 
@@ -974,11 +974,11 @@ class TestProgressStages:
             if result.returncode != 0:
                 pytest.skip(f"Inference failed: {result.stderr}")
 
-            stdout = result.stdout
+            combined = result.stdout + result.stderr
 
-            # Verify major stages appear in output
-            assert "weight_loading" in stdout.lower() or "Starting" in stdout
-            assert "complete" in stdout.lower()
+            # Progress messages go to stderr (ProgressReporter default)
+            assert "weight_loading" in combined.lower() or "Starting" in combined
+            assert "complete" in combined.lower()
 
 
 class TestVerboseTiming:
@@ -1109,14 +1109,14 @@ class TestVerboseTiming:
             if result.returncode != 0:
                 pytest.skip(f"Inference failed: {result.stderr}")
 
-            stdout = result.stdout
+            combined = result.stdout + result.stderr
 
-            # Verbose output should include timing information
+            # Verbose timing goes to stderr (ProgressReporter default)
             # Either "Timing breakdown:" or per-stage "(X.Xs)" timing
             assert (
-                "Timing breakdown:" in stdout or
-                "s)" in stdout  # e.g., "(1.2s)"
-            ), f"Expected timing info in verbose output, got: {stdout[:500]}"
+                "Timing breakdown:" in combined or
+                "s)" in combined  # e.g., "(1.2s)"
+            ), f"Expected timing info in verbose output, got: {combined[:500]}"
 
             # Timing.json should be created with stage data
             timing_file = output_dir / "timing.json"
@@ -1130,41 +1130,7 @@ class TestVerboseTiming:
             assert timing_data["total_seconds"] > 0
 
 
-class TestAtomicWrite:
-    """Tests for atomic write context manager."""
-
-    def test_atomic_write_success(self) -> None:
-        """Verify atomic write renames on success."""
-        from alphafold3_mlx.pipeline.output_handler import atomic_write
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            final_path = Path(tmpdir) / "test.json"
-
-            with atomic_write(final_path) as temp_path:
-                # Write to temp file
-                temp_path.write_text('{"test": true}')
-
-            # Should have renamed to final path
-            assert final_path.exists()
-            assert not temp_path.exists()
-            assert json.loads(final_path.read_text()) == {"test": True}
-
-    def test_atomic_write_cleanup_on_error(self) -> None:
-        """Verify atomic write cleans up temp file on error."""
-        from alphafold3_mlx.pipeline.output_handler import atomic_write
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            final_path = Path(tmpdir) / "test.json"
-
-            with pytest.raises(ValueError):
-                with atomic_write(final_path) as temp_path:
-                    temp_path.write_text('{"test": true}')
-                    raise ValueError("Test error")
-
-            # Should not have created final file
-            assert not final_path.exists()
-            # Temp file should be cleaned up
-            assert not temp_path.exists()
+# TestAtomicWrite moved to test_cli.py to avoid duplication.
 
 
 # =============================================================================
@@ -1176,7 +1142,7 @@ class TestJAXParity:
     """Tests for JAX parity validation.
 
     These tests compare MLX outputs to pre-generated JAX reference outputs.
-    Tolerances:
+    tolerances:
     - Backbone RMSD < 0.5 Angstrom
     - pLDDT MAE < 2 units
     - PAE MAE < 1 Angstrom
@@ -1557,7 +1523,7 @@ ATOM 4 CA CA GLY B 1 11.458 0.000 0.000 52.0
             assert "B" in result["stats"]["chain_ids"]
 
     def test_multichain_mmcif_chain_id_preservation(self) -> None:
-        """ : Verify chain IDs from input are preserved in output mmCIF.
+        """Verify chain IDs from input are preserved in output mmCIF.
 
         Phase 2 alignment: The output_handler uses token_metadata (containing
         asym_id from the featurisation batch) to ensure chain labels in the

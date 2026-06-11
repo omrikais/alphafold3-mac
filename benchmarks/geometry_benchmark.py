@@ -375,62 +375,51 @@ def benchmark_jax_vec3array(
     results = {}
 
     # Addition
-    def add_op():
-        return v1_x + v2_x, v1_y + v2_y, v1_z + v2_z
+    def bench_add():
+        r = v1_x + v2_x, v1_y + v2_y, v1_z + v2_z
+        jax.block_until_ready(r[0])
 
     results["add"] = benchmark_operation(
-        lambda: add_op(),
-        lambda: jax.block_until_ready(add_op()[0]),
-        num_warmup,
-        num_runs,
+        bench_add, lambda: None, num_warmup, num_runs,
     )
 
     # Dot product
-    def dot_op():
-        return v1_x * v2_x + v1_y * v2_y + v1_z * v2_z
+    def bench_dot():
+        r = v1_x * v2_x + v1_y * v2_y + v1_z * v2_z
+        jax.block_until_ready(r)
 
     results["dot"] = benchmark_operation(
-        lambda: dot_op(),
-        lambda: jax.block_until_ready(dot_op()),
-        num_warmup,
-        num_runs,
+        bench_dot, lambda: None, num_warmup, num_runs,
     )
 
     # Cross product
-    def cross_op():
+    def bench_cross():
         cx = v1_y * v2_z - v1_z * v2_y
         cy = v1_z * v2_x - v1_x * v2_z
         cz = v1_x * v2_y - v1_y * v2_x
-        return cx, cy, cz
+        jax.block_until_ready(cx)
 
     results["cross"] = benchmark_operation(
-        lambda: cross_op(),
-        lambda: jax.block_until_ready(cross_op()[0]),
-        num_warmup,
-        num_runs,
+        bench_cross, lambda: None, num_warmup, num_runs,
     )
 
     # Norm
-    def norm_op():
-        return jnp.sqrt(v1_x * v1_x + v1_y * v1_y + v1_z * v1_z)
+    def bench_norm():
+        r = jnp.sqrt(v1_x * v1_x + v1_y * v1_y + v1_z * v1_z)
+        jax.block_until_ready(r)
 
     results["norm"] = benchmark_operation(
-        lambda: norm_op(),
-        lambda: jax.block_until_ready(norm_op()),
-        num_warmup,
-        num_runs,
+        bench_norm, lambda: None, num_warmup, num_runs,
     )
 
     # Normalized
-    def normalized_op():
+    def bench_normalized():
         n = jnp.sqrt(jnp.maximum(v1_x * v1_x + v1_y * v1_y + v1_z * v1_z, 1e-6))
-        return v1_x / n, v1_y / n, v1_z / n
+        r = v1_x / n, v1_y / n, v1_z / n
+        jax.block_until_ready(r[0])
 
     results["normalized"] = benchmark_operation(
-        lambda: normalized_op(),
-        lambda: jax.block_until_ready(normalized_op()[0]),
-        num_warmup,
-        num_runs,
+        bench_normalized, lambda: None, num_warmup, num_runs,
     )
 
     return results
@@ -487,36 +476,31 @@ def benchmark_jax_rot3array(
     results = {}
 
     # Apply to point
-    def apply_op():
+    def bench_apply():
         rx = r1_xx * vx + r1_xy * vy + r1_xz * vz
         ry = r1_yx * vx + r1_yy * vy + r1_yz * vz
         rz = r1_zx * vx + r1_zy * vy + r1_zz * vz
-        return rx, ry, rz
+        jax.block_until_ready(rx)
 
     results["apply_to_point"] = benchmark_operation(
-        lambda: apply_op(),
-        lambda: jax.block_until_ready(apply_op()[0]),
-        num_warmup,
-        num_runs,
+        bench_apply, lambda: None, num_warmup, num_runs,
     )
 
     # Inverse (transpose)
-    def inverse_op():
-        return (
+    def bench_inverse():
+        r = (
             r1_xx, r1_yx, r1_zx,
             r1_xy, r1_yy, r1_zy,
             r1_xz, r1_yz, r1_zz,
         )
+        jax.block_until_ready(r[0])
 
     results["inverse"] = benchmark_operation(
-        lambda: inverse_op(),
-        lambda: jax.block_until_ready(inverse_op()[0]),
-        num_warmup,
-        num_runs,
+        bench_inverse, lambda: None, num_warmup, num_runs,
     )
 
     # Compose (matrix multiplication)
-    def compose_op():
+    def bench_compose():
         c_xx = r1_xx * r2_xx + r1_xy * r2_yx + r1_xz * r2_zx
         c_xy = r1_xx * r2_xy + r1_xy * r2_yy + r1_xz * r2_zy
         c_xz = r1_xx * r2_xz + r1_xy * r2_yz + r1_xz * r2_zz
@@ -526,13 +510,10 @@ def benchmark_jax_rot3array(
         c_zx = r1_zx * r2_xx + r1_zy * r2_yx + r1_zz * r2_zx
         c_zy = r1_zx * r2_xy + r1_zy * r2_yy + r1_zz * r2_zy
         c_zz = r1_zx * r2_xz + r1_zy * r2_yz + r1_zz * r2_zz
-        return c_xx, c_xy, c_xz, c_yx, c_yy, c_yz, c_zx, c_zy, c_zz
+        jax.block_until_ready(c_xx)
 
     results["compose"] = benchmark_operation(
-        lambda: compose_op(),
-        lambda: jax.block_until_ready(compose_op()[0]),
-        num_warmup,
-        num_runs,
+        bench_compose, lambda: None, num_warmup, num_runs,
     )
 
     # from_svd (quaternion-based algorithm)
@@ -575,11 +556,12 @@ def benchmark_jax_rot3array(
         rot = _jax_from_quaternion(w, x, y, z)
         return jnp.swapaxes(rot, -2, -1)
 
+    def bench_from_svd():
+        r = from_svd_op()
+        jax.block_until_ready(r)
+
     results["from_svd"] = benchmark_operation(
-        lambda: from_svd_op(),
-        lambda: jax.block_until_ready(from_svd_op()),
-        num_warmup,
-        num_runs,
+        bench_from_svd, lambda: None, num_warmup, num_runs,
     )
 
     return results
@@ -689,7 +671,7 @@ def run_comparison_benchmark(
         print(f"PASS: All {len(valid_results)} operations within {LATENCY_RATIO_THRESHOLD}x JAX baseline")
     else:
         failed = [r for r in valid_results if not r.within_threshold]
-        print(f"WARNING: {len(passed_results)}/{len(valid_results)} operations within {LATENCY_RATIO_THRESHOLD}x threshold")
+        print(f"{len(passed_results)}/{len(valid_results)} operations within {LATENCY_RATIO_THRESHOLD}x threshold")
         print()
         print("Passed operations:")
         for r in passed_results:

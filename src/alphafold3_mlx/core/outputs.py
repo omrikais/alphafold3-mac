@@ -13,7 +13,7 @@ from typing import Any, TYPE_CHECKING
 import mlx.core as mx
 import numpy as np
 
-from alphafold3_mlx.core.intermediates import AttentionIntermediates
+from alphafold3_mlx.core.intermediates import AttentionIntermediates, _to_numpy_safe
 
 if TYPE_CHECKING:
     from alphafold3_mlx.core.entities import (
@@ -25,26 +25,6 @@ if TYPE_CHECKING:
 
 # Type alias for array-like
 Array = Any
-
-
-def _to_numpy_safe(arr: Any) -> np.ndarray:
-    """Convert array to numpy, handling bfloat16 which NumPy doesn't support.
-
-    Args:
-        arr: Array-like object (MLX array, NumPy array, etc.)
-
-    Returns:
-        NumPy array (bfloat16 is converted to float32)
-    """
-    # Check if it's an MLX array with bfloat16 dtype
-    if hasattr(arr, 'dtype'):
-        dtype_str = str(arr.dtype)
-        if 'bfloat16' in dtype_str:
-            # MLX bfloat16 must be cast to float32 before NumPy conversion
-            import mlx.core as mx
-            arr = arr.astype(mx.float32)
-            mx.eval(arr)
-    return np.asarray(arr)
 
 
 @dataclass
@@ -80,7 +60,7 @@ class AttentionOutput:
 
 
 # =============================================================================
-# Model Output (Phase 3 )
+# Model Output (Phase 3 - )
 # =============================================================================
 
 

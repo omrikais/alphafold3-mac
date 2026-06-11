@@ -46,6 +46,9 @@ def _reference_output_available(filename: str) -> bool:
     return (REFERENCE_OUTPUTS_DIR / filename).exists()
 
 
+ 
+
+
 class TestA3MValidation:
     """Tests for A3M output validation."""
 
@@ -57,7 +60,7 @@ MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQQ
 >hit1
 MKT-YIAK--QISFVKS--SRQLEERLGLIEVQAPILSRVGDGTQDNLSGAE---QVKVKALPDAQFEVVHSLAKWKRQQIA
 """
-        lines = sample_a3m.strip.split("\n")
+        lines = sample_a3m.strip().split("\n")
 
         # Check format: alternating header and sequence lines
         for i, line in enumerate(lines):
@@ -66,7 +69,7 @@ MKT-YIAK--QISFVKS--SRQLEERLGLIEVQAPILSRVGDGTQDNLSGAE---QVKVKALPDAQFEVVHSLAKWKRQQ
             else:
                 # Sequence should only contain amino acids and gaps
                 valid_chars = set("ACDEFGHIKLMNPQRSTVWY-")
-                assert all(c in valid_chars for c in line.upper), (
+                assert all(c in valid_chars for c in line.upper()), (
                     f"Invalid character in sequence at line {i}: {line}"
                 )
 
@@ -95,7 +98,7 @@ class TestFeaturization:
         }
 
         # Validate mock features match schema
-        for name, spec in expected_features.items:
+        for name, spec in expected_features.items():
             assert name in mock_features, f"Missing feature: {name}"
             assert mock_features[name].dtype == spec["dtype"], (
                 f"Wrong dtype for {name}: {mock_features[name].dtype} != {spec['dtype']}"
@@ -128,20 +131,20 @@ class TestFeaturization:
         assert features["msa_mask"].shape[0] == n_seq
 
     @pytest.mark.skipif(
-        not _is_macos_arm64,
+        not _is_macos_arm64(),
         reason="Featurization parity tests only run on macOS ARM64",
     )
     def test_full_featurization_pipeline(self):
         """End-to-end test of featurization producing valid FeatureDict.
 
-        This test validates : Data pipeline identical outputs Mac vs Linux.
+        This test validates Data pipeline identical outputs Mac vs Linux.
         Uses synthetic MSA data (no databases required) to validate featurization parity.
         """
         ref_file = REFERENCE_OUTPUTS_DIR / "msa_featurization_reference.npz"
-        if not ref_file.exists:
+        if not ref_file.exists():
             pytest.skip(
                 f"Reference file not found: {ref_file}. "
-                "Generate with: docker build --platform linux/amd64 -f docker/Dockerfile.reference -t alphafold3-reference. && "
+                "Generate with: docker build --platform linux/amd64 -f docker/Dockerfile.reference -t alphafold3-reference . && "
                 "docker run --platform linux/amd64 --rm -v $(pwd)/tests/fixtures/reference_outputs:/output alphafold3-reference"
             )
 
@@ -161,7 +164,7 @@ class TestFeaturization:
             a3m=protein_a3m,
             deduplicate=True,
         )
-        protein_features = protein_msa.featurize
+        protein_features = protein_msa.featurize()
 
         np.testing.assert_array_equal(
             protein_features["msa"],
@@ -187,7 +190,7 @@ class TestFeaturization:
             a3m=rna_a3m,
             deduplicate=True,
         )
-        rna_features = rna_msa.featurize
+        rna_features = rna_msa.featurize()
 
         np.testing.assert_array_equal(
             rna_features["msa"],
@@ -210,7 +213,7 @@ class TestFeaturization:
             a3m=dna_a3m,
             deduplicate=True,
         )
-        dna_features = dna_msa.featurize
+        dna_features = dna_msa.featurize()
 
         np.testing.assert_array_equal(
             dna_features["msa"],
@@ -237,7 +240,7 @@ class TestDataPipelineIntegration:
     """End-to-end integration tests for the data pipeline."""
 
     @pytest.mark.skipif(
-        not _is_macos_arm64,
+        not _is_macos_arm64(),
         reason="Pipeline parity tests only run on macOS ARM64",
     )
     def test_pipeline_produces_valid_output(self):
@@ -247,7 +250,7 @@ class TestDataPipelineIntegration:
         Uses synthetic MSA sequences (no databases required).
         """
         ref_file = REFERENCE_OUTPUTS_DIR / "msa_featurization_reference.npz"
-        if not ref_file.exists:
+        if not ref_file.exists():
             pytest.skip(
                 f"Reference file not found: {ref_file}. "
                 "Generate with Docker - see tests/fixtures/reference_outputs/README.md"
@@ -290,7 +293,7 @@ class TestDataPipelineIntegration:
 
     def test_test_sequence_exists(self):
         """Verify the test sequence fixture file exists."""
-        assert TEST_SEQUENCE_PATH.exists, (
+        assert TEST_SEQUENCE_PATH.exists(), (
             f"Test sequence not found at {TEST_SEQUENCE_PATH}. "
             "Create tests/fixtures/test_sequence.fasta with a small protein sequence."
         )
@@ -298,7 +301,7 @@ class TestDataPipelineIntegration:
 
 # Skip marker for cross-platform tests requiring reference outputs
 requires_reference_outputs = pytest.mark.skipif(
-    not REFERENCE_OUTPUTS_DIR.exists or not any(REFERENCE_OUTPUTS_DIR.iterdir),
+    not REFERENCE_OUTPUTS_DIR.exists() or not any(REFERENCE_OUTPUTS_DIR.iterdir()),
     reason=(
         "Reference outputs not found. Generate with: "
         "python scripts/generate_reference_outputs.py --output tests/fixtures/reference_outputs/"
@@ -314,7 +317,7 @@ class TestCrossPlatformParity:
     """
 
     @pytest.mark.skipif(
-        not _is_macos_arm64,
+        not _is_macos_arm64(),
         reason="Cross-platform parity tests only run on macOS ARM64",
     )
     def test_cpp_extensions_available(self):
@@ -344,17 +347,17 @@ class TestCrossPlatformParity:
         except ImportError as e:
             pytest.fail(
                 f"C++ extensions not available: {e}. "
-                "Build with: pip install -e. or ./scripts/verify_cpp_extensions.sh"
+                "Build with: pip install -e . or ./scripts/verify_cpp_extensions.sh"
             )
 
     @pytest.mark.skipif(
-        not _is_macos_arm64,
+        not _is_macos_arm64(),
         reason="Cross-platform parity tests only run on macOS ARM64",
     )
     def test_fasta_parsing_parity(self):
         """Test FASTA parsing produces identical output to Linux reference."""
         ref_file = REFERENCE_OUTPUTS_DIR / "fasta_parsing_reference.npz"
-        if not ref_file.exists:
+        if not ref_file.exists():
             pytest.skip(
                 f"Reference file not found: {ref_file}. "
                 "Generate with: python scripts/generate_reference_outputs.py --force"
@@ -366,12 +369,12 @@ class TestCrossPlatformParity:
         reference = np.load(ref_file, allow_pickle=True)
 
         # Verify input file matches (by checksum)
-        input_checksum = reference["input_checksum"].item
+        input_checksum = reference["input_checksum"].item()
 
         # Read the test sequence file and verify checksum matches
-        if TEST_SEQUENCE_PATH.exists:
-            fasta_content = TEST_SEQUENCE_PATH.read_text
-            current_checksum = hashlib.sha256(fasta_content.encode).hexdigest
+        if TEST_SEQUENCE_PATH.exists():
+            fasta_content = TEST_SEQUENCE_PATH.read_text()
+            current_checksum = hashlib.sha256(fasta_content.encode()).hexdigest()
 
             if current_checksum != input_checksum:
                 pytest.skip(
@@ -409,13 +412,13 @@ class TestCrossPlatformParity:
             pytest.skip(f"Test sequence file not found: {TEST_SEQUENCE_PATH}")
 
     @pytest.mark.skipif(
-        not _is_macos_arm64,
+        not _is_macos_arm64(),
         reason="Cross-platform parity tests only run on macOS ARM64",
     )
     def test_msa_profile_parity(self):
         """Test MSA profile computation produces identical output to Linux reference."""
         ref_file = REFERENCE_OUTPUTS_DIR / "msa_profile_reference.npz"
-        if not ref_file.exists:
+        if not ref_file.exists():
             pytest.skip(
                 f"Reference file not found: {ref_file}. "
                 "Generate with: python scripts/generate_reference_outputs.py --force"
@@ -446,13 +449,13 @@ class TestCrossPlatformParity:
         )
 
     @pytest.mark.skipif(
-        not _is_macos_arm64,
+        not _is_macos_arm64(),
         reason="Cross-platform parity tests only run on macOS ARM64",
     )
     def test_string_array_parity(self):
         """Test string_array functions produce identical output to Linux reference."""
         ref_file = REFERENCE_OUTPUTS_DIR / "string_array_reference.npz"
-        if not ref_file.exists:
+        if not ref_file.exists():
             pytest.skip(
                 f"Reference file not found: {ref_file}. "
                 "Generate with: python scripts/generate_reference_outputs.py --force"
@@ -493,7 +496,7 @@ class TestCrossPlatformParity:
     def test_reference_outputs_directory_documented(self):
         """Verify reference outputs directory has documentation."""
         readme_path = REFERENCE_OUTPUTS_DIR / "README.md"
-        assert readme_path.exists, (
+        assert readme_path.exists(), (
             f"Reference outputs README not found at {readme_path}. "
             "This file documents how to generate reference outputs for validation."
         )
@@ -509,7 +512,7 @@ class TestCppExtensionBuild:
     """
 
     @pytest.mark.skipif(
-        not _is_macos_arm64,
+        not _is_macos_arm64(),
         reason="C++ extension build tests only run on macOS ARM64",
     )
     def test_cpp_module_importable(self):
@@ -521,11 +524,11 @@ class TestCppExtensionBuild:
         except ImportError as e:
             pytest.fail(
                 f"C++ module import failed: {e}. "
-                "Ensure package is installed: pip install -e."
+                "Ensure package is installed: pip install -e ."
             )
 
     @pytest.mark.skipif(
-        not _is_macos_arm64,
+        not _is_macos_arm64(),
         reason="C++ extension build tests only run on macOS ARM64",
     )
     def test_all_submodules_importable(self):
@@ -561,7 +564,7 @@ class TestCppExtensionBuild:
     def test_verification_script_exists(self):
         """Verify the C++ extension verification script exists."""
         script_path = Path(__file__).parent.parent.parent / "scripts" / "verify_cpp_extensions.sh"
-        assert script_path.exists, (
+        assert script_path.exists(), (
             f"Verification script not found at {script_path}. "
             "This script provides automated verification."
         )

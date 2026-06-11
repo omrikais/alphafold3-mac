@@ -1,6 +1,6 @@
 """Progress reporting for AlphaFold 3 MLX pipeline.
 
-This module provides progress reporting during inference .
+This module provides progress reporting during inference.
 
 Example:
     reporter = ProgressReporter(verbose=True)
@@ -114,7 +114,7 @@ class ProgressReporter:
         self._stages: list[StageInfo] = []
         self._current_stage: StageInfo | None = None
         self._start_time: float = time.time()
-        self._last_diffusion_report: int = -20 # Force first report
+        self._last_diffusion_report: int = -20  # Force first report
         # Inference component timing (from InferenceStats)
         self._inference_timing: dict[str, float] = {}
 
@@ -156,7 +156,7 @@ class ProgressReporter:
         # Report every 20 steps or at the last step
         if step % 20 == 0 or step == total - 1:
             if step > self._last_diffusion_report or step == total - 1:
-                self._print(f" Diffusion: step {step + 1}/{total}")
+                self._print(f"  Diffusion: step {step + 1}/{total}")
                 self._last_diffusion_report = step
 
     def on_recycling_iteration(self, iteration: int, total: int) -> None:
@@ -166,7 +166,7 @@ class ProgressReporter:
             iteration: Current iteration (0-indexed).
             total: Total number of iterations.
         """
-        self._print(f" Recycling: iteration {iteration + 1}/{total}")
+        self._print(f"  Recycling: iteration {iteration + 1}/{total}")
 
     def on_confidence_start(self) -> None:
         """Called when confidence computation begins."""
@@ -183,7 +183,7 @@ class ProgressReporter:
             sample: Current sample (0-indexed).
             total: Total number of samples.
         """
-        self._print(f" Processing sample {sample + 1}/{total}")
+        self._print(f"  Processing sample {sample + 1}/{total}")
 
     def set_inference_timing(
         self,
@@ -238,7 +238,7 @@ class ProgressReporter:
             # Print in order
             for stage_name in stage_order:
                 if stage_name in stage_times:
-                    self._print(f" {stage_name}: {stage_times[stage_name]:.1f}s")
+                    self._print(f"  {stage_name}: {stage_times[stage_name]:.1f}s")
 
     def get_timing_data(self, include_all_stages: bool = False) -> TimingData:
         """Return timing data for timing.json.

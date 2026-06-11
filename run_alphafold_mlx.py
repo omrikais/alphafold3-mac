@@ -191,7 +191,7 @@ def main() -> int:
         progress.on_stage_start("input_parsing")
         input_json = parse_input_json(cli_args.input_path)
 
-        # : Apply --restraints file if provided
+        # Apply --restraints file if provided
         if cli_args.restraints_file is not None:
             from alphafold3_mlx.pipeline.input_handler import apply_restraints_file
             input_json = apply_restraints_file(input_json, cli_args.restraints_file)

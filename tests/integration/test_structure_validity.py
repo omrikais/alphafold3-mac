@@ -12,7 +12,7 @@ import numpy as np
 import mlx.core as mx
 
 from alphafold3_mlx.model import Model
-from alphafold3_mlx.core import ModelConfig, FeatureBatch
+from alphafold3_mlx.core import ModelConfig
 from alphafold3_mlx.core.config import EvoformerConfig, DiffusionConfig, GlobalConfig
 from alphafold3_mlx.core.validation import (
     validate_bond_lengths,
@@ -21,22 +21,7 @@ from alphafold3_mlx.core.validation import (
     IDEAL_BOND_LENGTHS,
     IDEAL_BOND_ANGLES,
 )
-
-
-def create_test_batch(num_residues: int = 10, seed: int = 42) -> FeatureBatch:
-    """Create minimal feature batch for testing."""
-    np.random.seed(seed)
-
-    feature_dict = {
-        "aatype": np.random.randint(0, 20, size=num_residues).astype(np.int32),
-        "token_mask": np.ones(num_residues, dtype=np.float32),
-        "residue_index": np.arange(num_residues, dtype=np.int32),
-        "asym_id": np.zeros(num_residues, dtype=np.int32),
-        "entity_id": np.zeros(num_residues, dtype=np.int32),
-        "sym_id": np.zeros(num_residues, dtype=np.int32),
-    }
-
-    return FeatureBatch.from_numpy(feature_dict)
+from tests.integration.conftest import create_test_batch
 
 
 class TestIdealBondLengths:
@@ -62,9 +47,15 @@ class TestIdealBondLengths:
         coords = np.zeros((num_residues, max_atoms, 3))
         mask = np.zeros((num_residues, max_atoms))
 
-        # Set up simple linear chain with ideal bond lengths
+        # Set up simple linear chain with ideal bond lengths.
+        # Stride = N-CA + CA-C + C-N(next) so peptide bonds are exact.
+        stride = (
+            IDEAL_BOND_LENGTHS[("N", "CA")]
+            + IDEAL_BOND_LENGTHS[("CA", "C")]
+            + IDEAL_BOND_LENGTHS[("C", "N")]
+        )
         for i in range(num_residues):
-            x_offset = i * 3.8  # ~3.8Å per residue along chain
+            x_offset = i * stride
 
             # N at origin (for this residue's frame)
             coords[i, 0] = [x_offset, 0, 0]  # N
@@ -78,13 +69,13 @@ class TestIdealBondLengths:
             coords[i, 2] = [x_offset + IDEAL_BOND_LENGTHS[("N", "CA")] + IDEAL_BOND_LENGTHS[("CA", "C")], 0, 0]  # C
             mask[i, 2] = 1
 
-            # O perpendicular to backbone
-            coords[i, 3] = [
+            # O perpendicular to backbone at atom index 4 (not 3=CB)
+            coords[i, 4] = [
                 x_offset + IDEAL_BOND_LENGTHS[("N", "CA")] + IDEAL_BOND_LENGTHS[("CA", "C")],
                 IDEAL_BOND_LENGTHS[("C", "O")],
                 0
             ]  # O
-            mask[i, 3] = 1
+            mask[i, 4] = 1
 
         passed, rate, details = validate_bond_lengths(coords, mask)
 

@@ -1,6 +1,6 @@
 """Integration tests for CLI argument handling and execution.
 
-These tests verify the CLI (--help displays all arguments)
+These tests verify the CLI according to (--help displays all arguments)
 and (CLI produces valid output files).
 """
 
@@ -109,21 +109,8 @@ class TestCLIBasicExecution:
         assert result.returncode != 0
         assert "required" in result.stderr.lower() or "output_dir" in result.stderr.lower()
 
-    def test_basic_execution_input_not_found(self) -> None:
-        """Verify CLI shows error for non-existent input file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            result = subprocess.run(
-                [
-                    sys.executable, str(CLI_SCRIPT),
-                    "--input", "/nonexistent/path/input.json",
-                    "--output_dir", tmpdir,
-                ],
-                capture_output=True,
-                text=True,
-            )
-
-            assert result.returncode == 1
-            assert "not found" in result.stderr.lower() or "error" in result.stderr.lower()
+    # test_basic_execution_input_not_found covered by
+    # TestErrorHandling.test_input_not_found
 
     @pytest.mark.skipif(
         not FIXTURES_DIR.exists(),
@@ -221,13 +208,14 @@ class TestCLIArgumentParsing:
 
         assert args.input == "test.json"
         assert args.output_dir == "/tmp/out"
-        assert args.model_dir == "weights/model" # default
-        assert args.num_samples == 5 # default
-        assert args.diffusion_steps == 200 # default
-        assert args.seed is None # default
-        assert args.precision is None # default (auto-detect)
-        assert args.verbose is False # default
-        assert args.no_overwrite is False # default
+        from alphafold3_mlx.pipeline.cli import _resolve_model_dir
+        assert args.model_dir == _resolve_model_dir()  # default (env-aware)
+        assert args.num_samples == 5  # default
+        assert args.diffusion_steps == 200  # default
+        assert args.seed is None  # default
+        assert args.precision is None  # default (auto-detect)
+        assert args.verbose is False  # default
+        assert args.no_overwrite is False  # default
 
     def test_parse_args_all_values(self) -> None:
         """Verify all argument values can be set."""
@@ -464,48 +452,16 @@ class TestCLIArgumentsDataclass:
         assert cli_args.output_dir == Path("/tmp/out")
         assert cli_args.num_samples == 5
 
-    def test_cli_arguments_validation_num_samples(self) -> None:
-        """Verify CLIArguments rejects invalid num_samples."""
-        from alphafold3_mlx.pipeline.cli import CLIArguments
-        from alphafold3_mlx.pipeline.errors import InputError
-
-        with pytest.raises(InputError, match="num_samples must be >= 1"):
-            CLIArguments(
-                input_path=Path("test.json"),
-                output_dir=Path("/tmp"),
-                num_samples=0,
-            )
-
-    def test_cli_arguments_validation_diffusion_steps(self) -> None:
-        """Verify CLIArguments rejects invalid diffusion_steps."""
-        from alphafold3_mlx.pipeline.cli import CLIArguments
-        from alphafold3_mlx.pipeline.errors import InputError
-
-        with pytest.raises(InputError, match="diffusion_steps must be >= 1"):
-            CLIArguments(
-                input_path=Path("test.json"),
-                output_dir=Path("/tmp"),
-                diffusion_steps=0,
-            )
-
-    def test_cli_arguments_validation_negative_seed(self) -> None:
-        """Verify CLIArguments rejects negative seed."""
-        from alphafold3_mlx.pipeline.cli import CLIArguments
-        from alphafold3_mlx.pipeline.errors import InputError
-
-        with pytest.raises(InputError, match="seed must be non-negative"):
-            CLIArguments(
-                input_path=Path("test.json"),
-                output_dir=Path("/tmp"),
-                seed=-1,
-            )
+    # Validation for num_samples=0, diffusion_steps=0, and seed=-1 are
+    # covered by TestNumSamplesParameter, TestDiffusionStepsParameter,
+    # and TestSeedReproducibility respectively.
 
 
 class TestErrorHandling:
     """Tests for graceful error handling (User Story 5).
 
     These tests verify that the CLI provides clear, actionable error messages
-    for all failure modes .
+    for all failure modes according to .
     """
 
     def test_input_not_found(self) -> None:
@@ -692,35 +648,8 @@ class TestErrorHandling:
                 f"Expected 'exist' or 'overwrite' in stderr: {result.stderr}"
             )
 
-    @pytest.mark.skipif(
-        sys.platform == "darwin",
-        reason="Cannot test platform rejection on macOS"
-    )
-    def test_platform_rejection(self) -> None:
-        """Verify CLI rejects non-Apple Silicon platforms.
-
-        This test can only run on non-macOS platforms.
-
-        Expected error message format (Phase 3 alignment):
-        "This tool requires Apple Silicon (M2/M3/M4). Detected: {platform}"
-        """
-        with tempfile.TemporaryDirectory() as tmpdir:
-            result = subprocess.run(
-                [
-                    sys.executable, str(CLI_SCRIPT),
-                    "--input", "test.json",
-                    "--output_dir", tmpdir,
-                ],
-                capture_output=True,
-                text=True,
-            )
-
-            assert result.returncode == 1
-            stderr_lower = result.stderr.lower()
-            # Phase 3+ uses "Apple Silicon (M2/M3/M4)" message format
-            assert "apple silicon" in stderr_lower or "m2/m3/m4" in stderr_lower.replace(" ", ""), (
-                f"Expected platform-related error in stderr: {result.stderr}"
-            )
+    # test_platform_rejection is covered by
+    # TestCLIPlatformValidation.test_platform_rejection_on_non_apple_silicon
 
     def test_failure_log_written(self) -> None:
         """Verify failure_log.json is written on error.
