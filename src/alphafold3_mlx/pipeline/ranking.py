@@ -196,7 +196,7 @@ def compute_aggregate_metrics(ranking: SampleRanking) -> dict[str, float]:
     best_ptm = best_score.ptm
 
     # Mean pLDDT across all samples
-    mean_plddts = [s.mean_plddt for s in ranking.scores.values]
+    mean_plddts = [s.mean_plddt for s in ranking.scores.values()]
     mean_plddt_all = sum(mean_plddts) / len(mean_plddts)
 
     # Variance of mean pLDDT across samples

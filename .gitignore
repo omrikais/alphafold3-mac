@@ -67,8 +67,8 @@ frontend/.next/
 frontend/.env.local
 frontend/.env*.local
 
-# API runtime data
-data/
+# API runtime data (repo-root only; must not match src/**/data/ source packages)
+/data/
 
 # Local configuration and server logs
 .dev-logs/
