@@ -113,7 +113,7 @@ class ProgressReporter:
 
         self._stages: list[StageInfo] = []
         self._current_stage: StageInfo | None = None
-        self._start_time: float = time.time
+        self._start_time: float = time.time()
         self._last_diffusion_report: int = -20 # Force first report
         # Inference component timing (from InferenceStats)
         self._inference_timing: dict[str, float] = {}
@@ -124,7 +124,7 @@ class ProgressReporter:
         Args:
             stage: Name of the stage starting.
         """
-        self._current_stage = StageInfo(name=stage, start_time=time.time)
+        self._current_stage = StageInfo(name=stage, start_time=time.time())
         self._print(f"[{stage}] Starting...")
 
     def on_stage_end(self, stage: str) -> None:
@@ -134,7 +134,7 @@ class ProgressReporter:
             stage: Name of the stage ending.
         """
         if self._current_stage and self._current_stage.name == stage:
-            self._current_stage.end_time = time.time
+            self._current_stage.end_time = time.time()
             self._stages.append(self._current_stage)
 
             if self.verbose:
@@ -212,7 +212,7 @@ class ProgressReporter:
 
         Prints total elapsed time and optionally per-stage timing.
         """
-        total_time = time.time - self._start_time
+        total_time = time.time() - self._start_time
         self._print(f"\nInference complete! Total time: {total_time:.1f}s")
 
         if self.verbose:
@@ -232,7 +232,7 @@ class ProgressReporter:
                 if stage.duration is not None:
                     stage_times[stage.name] = stage.duration
             # Add inference component timing
-            for key, value in self._inference_timing.items:
+            for key, value in self._inference_timing.items():
                 if value > 0:
                     stage_times[key] = value
             # Print in order
@@ -250,7 +250,7 @@ class ProgressReporter:
         Returns:
             TimingData with total time and per-stage breakdown.
         """
-        total_time = time.time - self._start_time
+        total_time = time.time() - self._start_time
         stages: dict[str, float] = {}
 
         for stage in self._stages:
@@ -258,7 +258,7 @@ class ProgressReporter:
                 stages[stage.name] = stage.duration
 
         # Add inference component timing
-        for key, value in self._inference_timing.items:
+        for key, value in self._inference_timing.items():
             if value > 0 or include_all_stages:
                 stages[key] = value
 
@@ -294,7 +294,7 @@ class ProgressReporter:
 
         # Include current stage if active
         if self._current_stage:
-            elapsed = time.time - self._current_stage.start_time
+            elapsed = time.time() - self._current_stage.start_time
             normalized = self._normalize_stage(self._current_stage.name)
             snapshot[normalized] = snapshot.get(normalized, 0.0) + elapsed
 
@@ -337,4 +337,4 @@ class ProgressReporter:
             message: Message to print.
         """
         print(message, file=self.output)
-        self.output.flush
+        self.output.flush()
