@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Callable
 
 import mlx.core as mx
 
-from alphafold3_mlx.restraints.loss import contact_loss, repulsive_loss
 
 if TYPE_CHECKING:
     from alphafold3_mlx.restraints.types import (
@@ -135,41 +134,46 @@ def compute_guidance_weight(
 def _find_coupling_chain_pairs(
     resolved_distance: list["ResolvedDistanceRestraint"],
     chain_token_ranges: dict[int, tuple[int, int]],
+    resolved_contact: "list[ResolvedContactRestraint] | None" = None,
 ) -> list[tuple[tuple[int, int], tuple[int, int], float]]:
-    """Identify FULL-CHAIN coupling pairs from inter-chain distance restraints.
+    """Identify FULL-CHAIN coupling pairs from inter-chain restraints.
 
-    For each inter-chain DISTANCE restraint, returns the FULL chain ranges
-    for both chains.  Using full-chain ranges produces pure rigid-body
+    For each inter-chain restraint, returns the FULL chain ranges for
+    both chains.  Using full-chain ranges produces pure rigid-body
     translation (gradient distributes equally among all CA atoms), which
     Kabsch alignment removes completely — zero RMSD impact.
 
-    Contact restraints are intentionally excluded: their loss function
-    produces adequate per-atom gradients without additional coupling, and
-    coupling can interfere with contact satisfaction.
+    Distance restraints are checked first.  When no inter-chain distance
+    restraints exist, contact restraints are used as fallback so that
+    contact-only docking still triggers CoM coupling to bring chains
+    into proximity during high-sigma early diffusion steps.
 
     Returns:
         List of (chain_range_i, chain_range_j, weight) tuples where each
         range is (start_token, end_token) for the full chain.
     """
 
-    def _chain_of(token_idx: int) -> int | None:
-        for cid, (s, e) in chain_token_ranges.items():
-            if s <= token_idx < e:
-                return cid
-        return None
+    # Build O(1) token-to-chain lookup (avoids O(C) scan per query).
+    max_token = max(e for _, e in chain_token_ranges.values()) if chain_token_ranges else 0
+    token_to_chain: list[int | None] = [None] * max_token
+    for cid, (s, e) in chain_token_ranges.items():
+        for t in range(s, e):
+            token_to_chain[t] = cid
 
     # Collect unique inter-chain pairs (deduplicate by chain pair).
     # When multiple restraints span the same chain pair with different
     # weights, use the max weight so coupling strength is independent
     # of restraint list order.
     pair_map: dict[tuple[int, int], tuple[tuple[int, int], tuple[int, int], float]] = {}
+    n_interchain = 0
 
     for r in resolved_distance:
         token_i = r.atom_i_idx[0]
         token_j = r.atom_j_idx[0]
-        ci = _chain_of(token_i)
-        cj = _chain_of(token_j)
+        ci = token_to_chain[token_i] if token_i < max_token else None
+        cj = token_to_chain[token_j] if token_j < max_token else None
         if ci is not None and cj is not None and ci != cj:
+            n_interchain += 1
             key = (min(ci, cj), max(ci, cj))
             if key not in pair_map or r.weight > pair_map[key][2]:
                 pair_map[key] = (
@@ -178,17 +182,9 @@ def _find_coupling_chain_pairs(
                     r.weight,
                 )
 
-    pairs = list(pair_map.values())
-
     # When many distance restraints exist, their per-atom gradients already
     # provide adequate chain-level force.  Coupling is only needed to
-    # supplement sparse cases (1-2 restraints).  With 3+ inter-chain
-    # distances, coupling interferes with contact satisfaction.
-    n_interchain = sum(
-        1 for r in resolved_distance
-        if _chain_of(r.atom_i_idx[0]) != _chain_of(r.atom_j_idx[0])
-        and _chain_of(r.atom_i_idx[0]) is not None
-    )
+    # supplement sparse cases (1-2 restraints).
     if n_interchain > MAX_INTERCHAIN_FOR_COUPLING:
         logger.info(
             "Skipping coupling: %d inter-chain distance restraints "
@@ -197,7 +193,32 @@ def _find_coupling_chain_pairs(
         )
         return []
 
-    return pairs
+    # Fallback: when no inter-chain distance restraints exist, use contact
+    # restraints for coupling.  Without this, contact-only docking fails
+    # because per-atom contact gradients are too weak to bring chains
+    # together from ~1000+ Å separation during high-sigma early steps.
+    if not pair_map and resolved_contact:
+        for r in resolved_contact:
+            src_token = r.source_atom_idx[0]
+            ci = token_to_chain[src_token] if src_token < max_token else None
+            for cand_idx in r.candidate_atom_idxs:
+                cand_token = cand_idx[0]
+                cj = token_to_chain[cand_token] if cand_token < max_token else None
+                if ci is not None and cj is not None and ci != cj:
+                    key = (min(ci, cj), max(ci, cj))
+                    if key not in pair_map or r.weight > pair_map[key][2]:
+                        pair_map[key] = (
+                            chain_token_ranges[key[0]],
+                            chain_token_ranges[key[1]],
+                            r.weight,
+                        )
+        if pair_map:
+            logger.info(
+                "Contact-only coupling: %d chain pair(s) from contact restraints",
+                len(pair_map),
+            )
+
+    return list(pair_map.values())
 
 
 def build_guidance_fn(
@@ -264,7 +285,7 @@ def build_guidance_fn(
     coupling_pairs: list[tuple[tuple[int, int], tuple[int, int], float]] = []
     if chain_token_ranges is not None and len(chain_token_ranges) > 1:
         coupling_pairs = _find_coupling_chain_pairs(
-            resolved_distance, chain_token_ranges,
+            resolved_distance, chain_token_ranges, resolved_contact,
         )
         if coupling_pairs:
             logger.info(
@@ -272,38 +293,12 @@ def build_guidance_fn(
                 len(coupling_pairs),
             )
 
-    # Separate loss functions for atom-level restraints and coupling.
+    # Atom-level loss combining all restraint types (used with mx.grad).
     def atom_loss_fn(positions: mx.array) -> mx.array:
-        total = mx.array(0.0)
-
-        for r in resolved_distance:
-            pos_i = positions[r.atom_i_idx[0], r.atom_i_idx[1]]
-            pos_j = positions[r.atom_j_idx[0], r.atom_j_idx[1]]
-            diff = pos_i - pos_j
-            dist = mx.sqrt(mx.sum(diff * diff) + 1e-8)
-            total = total + r.weight * ((dist - r.target_distance) / r.sigma) ** 2
-
-        if resolved_contact:
-            for r in resolved_contact:
-                total = total + contact_loss(
-                    positions,
-                    source_atom_idx=r.source_atom_idx,
-                    candidate_atom_idxs=r.candidate_atom_idxs,
-                    threshold=r.threshold,
-                    weight=r.weight,
-                )
-
-        if resolved_repulsive:
-            for r in resolved_repulsive:
-                total = total + repulsive_loss(
-                    positions,
-                    atom_i_idx=r.atom_i_idx,
-                    atom_j_idx=r.atom_j_idx,
-                    min_distance=r.min_distance,
-                    weight=r.weight,
-                )
-
-        return total
+        from alphafold3_mlx.restraints.loss import combined_restraint_loss
+        return combined_restraint_loss(
+            positions, resolved_distance, resolved_contact, resolved_repulsive,
+        )
 
     atom_grad_fn = mx.grad(atom_loss_fn)
 

@@ -15,6 +15,7 @@ from typing import Any
 
 import mlx.core as mx
 
+from alphafold3_mlx.core.atom_constants import IDEAL_BOND_LENGTHS, IDEAL_BOND_ANGLES
 from alphafold3_mlx.core.config import AttentionConfig
 
 
@@ -204,7 +205,6 @@ def get_available_memory_gb() -> float:
         Available memory in GB (unified memory on Apple Silicon).
     """
     import subprocess
-    import re
 
     try:
         # Get total physical memory from sysctl on macOS
@@ -222,7 +222,7 @@ def get_available_memory_gb() -> float:
 
 
 # =============================================================================
-# NaN Detection (Phase 3 )
+# NaN Detection (Phase 3 - )
 # =============================================================================
 
 
@@ -296,26 +296,6 @@ def check_nan_dict(
 # =============================================================================
 
 
-# Ideal bond lengths in Angstroms (from standard amino acid geometry)
-IDEAL_BOND_LENGTHS = {
-    ("N", "CA"): 1.458,
-    ("CA", "C"): 1.525,
-    ("C", "O"): 1.229,
-    ("C", "N"): 1.329,  # peptide bond
-    ("CA", "CB"): 1.530,
-}
-
-# Ideal bond angles in degrees
-IDEAL_BOND_ANGLES = {
-    ("N", "CA", "C"): 111.2,
-    ("CA", "C", "O"): 120.8,
-    ("CA", "C", "N"): 116.2,  # to next residue
-    ("C", "N", "CA"): 121.7,  # from previous residue
-    ("N", "CA", "CB"): 110.5,
-    ("C", "CA", "CB"): 110.1,
-}
-
-
 def validate_bond_lengths(
     coords: "np.ndarray",
     mask: "np.ndarray",
@@ -337,12 +317,12 @@ def validate_bond_lengths(
     """
     import numpy as np
 
-    # Atom indices in atom37 format: N=0, CA=1, C=2, O=3, CB=4
+    # Atom indices in atom37 format: N=0, CA=1, C=2, CB=3, O=4
     ATOM_N = 0
     ATOM_CA = 1
     ATOM_C = 2
-    ATOM_O = 3
-    ATOM_CB = 4
+    ATOM_CB = 3
+    ATOM_O = 4
 
     num_residues = coords.shape[0]
     bond_errors = []
@@ -439,8 +419,8 @@ def validate_bond_angles(
     ATOM_N = 0
     ATOM_CA = 1
     ATOM_C = 2
-    ATOM_O = 3
-    ATOM_CB = 4
+    ATOM_CB = 3
+    ATOM_O = 4
 
     num_residues = coords.shape[0]
     angle_errors = []

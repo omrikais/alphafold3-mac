@@ -1,6 +1,6 @@
 """Large protein memory tests.
 
-Tests memory requirements for large proteins:
+Tests memory requirements for large proteins as specified in
 - 1000 residues: <100GB peak memory
 - 2000 residues: graceful rejection or handling within limits
 """
@@ -55,7 +55,9 @@ class TestLargeProteinMemory:
     """Test memory handling for large proteins."""
 
     def test_1000_residue_memory_estimate(self):
-        """Test that 1000-residue estimate is reasonable. requirement: 1000 residues should require <100GB.
+        """Test that 1000-residue estimate is reasonable.
+
+        requirement: 1000 residues should require <100GB.
         """
         estimate = estimate_peak_memory_gb(1000, num_samples=5)
 
@@ -65,7 +67,9 @@ class TestLargeProteinMemory:
         )
 
     def test_2000_residue_detection(self):
-        """Test that 2000-residue proteins are handled appropriately. requirement: 2000 residues should either work within memory
+        """Test that 2000-residue proteins are handled appropriately.
+
+        requirement: 2000 residues should either work within memory
         limits or be gracefully rejected.
         """
         estimate = estimate_peak_memory_gb(2000, num_samples=5)
@@ -74,7 +78,7 @@ class TestLargeProteinMemory:
         print(f"2000 residue estimate: {estimate:.1f}GB")
 
         # Either it fits (estimate < available) or rejection works
-        available = get_available_memory_gb
+        available = get_available_memory_gb()
 
         if estimate > available * 0.8:
             # Should raise MemoryError when checked
@@ -97,8 +101,8 @@ class TestLargeProteinMemory:
         # Simulate low memory scenario
         with pytest.raises(MemoryError) as exc_info:
             check_memory_requirements(
-                num_residues=5000, # Very large
-                available_gb=32, # Limited memory
+                num_residues=5000,  # Very large
+                available_gb=32,  # Limited memory
                 num_samples=5,
             )
 
@@ -118,9 +122,9 @@ class TestLargeProteinMemory:
         except MemoryError as e:
             error_str = str(e)
             # Should mention residue count
-            assert "3000" in error_str or "residue" in error_str.lower
+            assert "3000" in error_str or "residue" in error_str.lower()
             # Should mention memory
-            assert "memory" in error_str.lower or "GB" in error_str
+            assert "memory" in error_str.lower() or "GB" in error_str
 
 
 class TestLargeProteinAllocation:
@@ -145,7 +149,7 @@ class TestLargeProteinAllocation:
         # Clean up
         del pair, single
         try:
-            mx.metal.clear_cache
+            mx.metal.clear_cache()
         except AttributeError:
             pass
 
@@ -178,7 +182,7 @@ class TestLargeProteinAllocation:
         # Simulate large sequence attention
         batch = 1
         heads = 4
-        seq = 512 # Moderate size for testing
+        seq = 512  # Moderate size for testing
         head_dim = 64
 
         q = mx.random.normal(shape=(batch, heads, seq, head_dim), key=mx.random.key(0))
@@ -217,7 +221,7 @@ class TestGracefulDegradation:
 
     def test_get_available_memory(self):
         """Test that available memory detection works."""
-        available = get_available_memory_gb
+        available = get_available_memory_gb()
 
         # Should return positive value
         assert available > 0

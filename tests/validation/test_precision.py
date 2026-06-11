@@ -1,6 +1,6 @@
 """Precision validation tests for MLX attention spike.
 
-These tests are mandatory - reduced precision must match within tolerance.
+These tests are mandatory per - reduced precision must match within tolerance.
 """
 
 import mlx.core as mx
@@ -41,7 +41,7 @@ class TestFloat16Precision:
         """Float16 MLX output matches JAX with identical float16 inputs.
 
         Both backends receive the SAME float16 inputs to ensure fair comparison.
-        This is mandatory.
+        This is mandatory per .
         """
         import jax.numpy as jnp
 
@@ -125,7 +125,7 @@ class TestBFloat16Precision:
         2. Cast to bfloat16 in MLX
         3. Use the bfloat16→float32 roundtrip values for JAX to ensure identical inputs
 
-        This is mandatory.
+        This is mandatory per .
         """
         import jax.numpy as jnp
 

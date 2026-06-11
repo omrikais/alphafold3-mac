@@ -1,6 +1,6 @@
 """Unit tests for Rot3Array struct-of-arrays.
 
-These tests validate the Rot3Array implementation.
+These tests validate the Rot3Array implementation for .
 Tests are written first (TDD) to define expected behavior.
 """
 

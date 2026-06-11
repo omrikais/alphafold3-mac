@@ -1,6 +1,6 @@
 """Sample ranking for AlphaFold 3 MLX pipeline.
 
-This module provides sample ranking by confidence metrics .
+This module provides sample ranking by confidence metrics.
 
 Example:
     ranking = rank_samples(confidence_scores, is_complex=False)

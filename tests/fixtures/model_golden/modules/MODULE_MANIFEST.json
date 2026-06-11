@@ -1,6 +1,6 @@
 {
   "version": "3.0.0",
-  "description": "JAX CPU reference outputs for full module-level numerical parity validation",
+  "description": "JAX CPU reference outputs for full module-level validation",
   "platform": "Darwin",
   "python_version": "3.12.12 (main, Oct  9 2025, 11:07:00) [Clang 17.0.0 (clang-1700.6.3.2)]",
   "jax_version": "0.8.1",
@@ -60,7 +60,7 @@
       "tolerances": {
         "rmsd": 0.5
       },
-      "note": "MLX MUST use exact same weights for RMSD < 0.5\u00c5"
+      "note": "MLX MUST use exact same weights for RMSD < 0.5Å"
     }
   },
   "regeneration_command": "python scripts/generate_jax_module_references.py --output tests/fixtures/model_golden/modules/",

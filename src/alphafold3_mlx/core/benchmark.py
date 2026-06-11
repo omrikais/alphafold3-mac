@@ -93,7 +93,7 @@ def theoretical_minimum_bytes(
 ) -> int:
     """Calculate theoretical minimum memory for attention.
 
-    Updated:
+    (updated):
     - Base: Q + K + V + output = 4 × batch × heads × seq × head_dim
     - Logits: batch × heads × seq_q × seq_k (inherent to SDPA)
     - Bias: batch × heads × seq_q × seq_k (if using additive bias)
@@ -101,7 +101,7 @@ def theoretical_minimum_bytes(
     For cross-attention (seq_q != seq_k), shapes are handled correctly.
 
     Note: Always uses float32 (4 bytes/element) regardless of config.dtype
-    because The policy requires float32 internal computation for numerical
+    because requires float32 internal computation for numerical
     stability. The attention implementation upcasts Q, K, V to float32
     before SDPA execution.
 

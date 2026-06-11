@@ -13,7 +13,6 @@ import { PlddtChart } from "./plddt-chart";
 import { PaeHeatmap } from "./pae-heatmap";
 import { RestraintViz } from "@/components/restraint-viz";
 import type { JobDetail } from "@/lib/types";
-import type { RestraintSatisfaction } from "@/lib/restraints";
 
 interface Props {
   job: JobDetail;
@@ -77,7 +76,7 @@ export function JobResultsView({ job }: Props) {
         <section className="space-y-5">
           <StructureViewer
             cifUrl={cifUrl}
-            satisfaction={sampleData?.restraint_satisfaction as RestraintSatisfaction | undefined}
+            satisfaction={sampleData?.restraint_satisfaction}
           />
           <div
             className={`grid grid-cols-1 gap-5 lg:grid-cols-2 transition-opacity duration-200 ${sampleFetching ? "opacity-55" : "opacity-100"}`}
@@ -110,7 +109,7 @@ export function JobResultsView({ job }: Props) {
 
           {sampleData?.restraint_satisfaction && (
             <RestraintViz
-              satisfaction={sampleData.restraint_satisfaction as RestraintSatisfaction}
+              satisfaction={sampleData.restraint_satisfaction}
             />
           )}
         </aside>

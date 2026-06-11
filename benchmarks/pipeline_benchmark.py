@@ -2,7 +2,7 @@
 """Performance benchmark for AlphaFold 3 MLX pipeline.
 
 This script benchmarks the full inference pipeline on proteins of various sizes
-to validate the target: <10 min for 200 residues with 5 samples on M4 Max.
+to validate <10 min for 200 residues with 5 samples on M4 Max.
 
 Usage:
     python benchmarks/pipeline_benchmark.py --size 200 --num_samples 5
@@ -345,7 +345,7 @@ def main() -> int:
     # Return exit code based on threshold
     for r in results:
         if r.size == 200 and r.num_samples == 5 and not r.passed_threshold:
-            print(f"\nFAILED: 200 residues took {r.total_seconds:.1f}s (> 600s threshold)")
+            print(f"\nFAILED 200 residues took{r.total_seconds:.1f}s (> 600s threshold)")
             return 1
 
     return 0

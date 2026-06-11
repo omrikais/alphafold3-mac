@@ -12,25 +12,10 @@ import mlx.core as mx
 
 from alphafold3_mlx.geometry import Vec3Array, Rot3Array
 from alphafold3_mlx.model import Model
-from alphafold3_mlx.core import ModelConfig, FeatureBatch
+from alphafold3_mlx.core import ModelConfig
 from alphafold3_mlx.core.config import EvoformerConfig, DiffusionConfig, GlobalConfig
 from alphafold3_mlx.network.diffusion_head import DiffusionHead
-
-
-def create_test_batch(num_residues: int = 10, seed: int = 42) -> FeatureBatch:
-    """Create minimal feature batch for testing."""
-    np.random.seed(seed)
-
-    feature_dict = {
-        "aatype": np.random.randint(0, 20, size=num_residues).astype(np.int32),
-        "token_mask": np.ones(num_residues, dtype=np.float32),
-        "residue_index": np.arange(num_residues, dtype=np.int32),
-        "asym_id": np.zeros(num_residues, dtype=np.int32),
-        "entity_id": np.zeros(num_residues, dtype=np.int32),
-        "sym_id": np.zeros(num_residues, dtype=np.int32),
-    }
-
-    return FeatureBatch.from_numpy(feature_dict)
+from tests.integration.conftest import create_test_batch
 
 
 class TestVec3ArrayIntegration:

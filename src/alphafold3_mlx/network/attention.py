@@ -23,8 +23,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-import numpy as np
-
 import mlx.core as mx
 import mlx.nn as nn
 
@@ -79,122 +77,6 @@ def detect_fully_masked_rows(boolean_mask: mx.array) -> mx.array:
     # mx.any returns True if any element is True
     has_valid_key = mx.any(boolean_mask, axis=-1, keepdims=True)
     return ~has_valid_key
-
-
-def _dot_product_attention_af3(
-    query: mx.array,
-    key: mx.array,
-    value: mx.array,
-    mask: mx.array | None = None,
-    bias: mx.array | None = None,
-) -> mx.array:
-    """Scaled dot-product attention using MLX SDPA.
-
-    Args:
-        query: [..., seq_q, num_heads, head_dim]
-        key:   [..., seq_k, num_heads, head_dim]
-        value: [..., seq_k, num_heads, head_dim]
-        mask: Boolean mask broadcastable to [..., num_heads, seq_q, seq_k]
-              where True=attend, False=mask
-        bias: Additive bias broadcastable to [..., num_heads, seq_q, seq_k]
-
-    Returns:
-        Output: [..., seq_q, num_heads, head_dim]
-    """
-    head_dim = query.shape[-1]
-    num_heads = query.shape[-2]
-    scale = 1.0 / (head_dim ** 0.5)
-
-    # Get leading dimensions (could be empty, [batch], or [batch, rows], etc.)
-    leading_dims = query.shape[:-3]
-    seq_q = query.shape[-3]
-    seq_k = key.shape[-3]
-
-    # Flatten leading dimensions into batch for SDPA
-    # [..., seq, heads, dim] -> [batch_flat, seq, heads, dim]
-    if len(leading_dims) > 0:
-        batch_flat = int(np.prod(leading_dims))
-        q_flat = query.reshape(batch_flat, seq_q, num_heads, head_dim)
-        k_flat = key.reshape(batch_flat, seq_k, num_heads, head_dim)
-        v_flat = value.reshape(batch_flat, seq_k, num_heads, head_dim)
-    else:
-        # No leading dims - add batch dim
-        batch_flat = 1
-        q_flat = query[None]  # [1, seq_q, heads, dim]
-        k_flat = key[None]
-        v_flat = value[None]
-
-    # Transpose to SDPA format: [batch, heads, seq, dim]
-    q_sdpa = q_flat.transpose(0, 2, 1, 3)
-    k_sdpa = k_flat.transpose(0, 2, 1, 3)
-    v_sdpa = v_flat.transpose(0, 2, 1, 3)
-
-    # Pre-cast Q/K/V to same dtype for performance (avoid 50-100% regression)
-    compute_dtype = q_sdpa.dtype
-    if k_sdpa.dtype != compute_dtype:
-        k_sdpa = k_sdpa.astype(compute_dtype)
-    if v_sdpa.dtype != compute_dtype:
-        v_sdpa = v_sdpa.astype(compute_dtype)
-
-    # Build combined additive mask for SDPA
-    combined_mask = None
-    fully_masked_rows = None
-
-    if mask is not None:
-        # Convert boolean mask to additive format using helper
-        # mask has shape [..., num_heads, seq_q, seq_k] with True=attend
-        # Flatten leading dims to match batch_flat
-        if len(leading_dims) > 0:
-            mask_flat = mask.reshape(batch_flat, num_heads, seq_q, seq_k)
-        else:
-            mask_flat = mask[None] if mask.ndim == 3 else mask
-
-        # Detect fully masked rows (all False in key dimension)
-        # Shape: [batch, heads, seq_q]
-        has_valid_key = mx.any(mask_flat, axis=-1)
-        fully_masked_rows = ~has_valid_key  # [batch, heads, seq_q]
-
-        # Convert boolean to additive: True→0, False→-mask_value
-        combined_mask = boolean_to_additive_mask(mask_flat)
-
-    if bias is not None:
-        # Flatten bias leading dims to match batch_flat
-        if len(leading_dims) > 0:
-            bias_flat = bias.reshape(batch_flat, num_heads, seq_q, seq_k)
-        else:
-            bias_flat = bias[None] if bias.ndim == 3 else bias
-
-        if combined_mask is not None:
-            combined_mask = combined_mask + bias_flat
-        else:
-            combined_mask = bias_flat
-
-    # Use MLX SDPA kernel
-    # Cast mask to Q dtype so SDPA mask promotes to output dtype (e.g. bfloat16)
-    if combined_mask is not None and combined_mask.dtype != q_sdpa.dtype:
-        combined_mask = combined_mask.astype(q_sdpa.dtype)
-    output = mx.fast.scaled_dot_product_attention(
-        q_sdpa, k_sdpa, v_sdpa,
-        scale=scale,
-        mask=combined_mask,
-    )  # [batch_flat, heads, seq_q, dim]
-
-    # Zero fully masked rows
-    if fully_masked_rows is not None:
-        # Expand to [batch, heads, seq_q, dim]
-        fully_masked_expanded = fully_masked_rows[..., None]
-        output = mx.where(fully_masked_expanded, 0.0, output)
-
-    # Transpose back: [batch, heads, seq, dim] -> [batch, seq, heads, dim]
-    output = output.transpose(0, 2, 1, 3)
-
-    # Reshape back to original leading dimensions
-    if len(leading_dims) > 0:
-        output = output.reshape(*leading_dims, seq_q, num_heads, head_dim)
-    else:
-        output = output[0]  # Remove added batch dim
-
-    return output
 
 
 class AF3SelfAttention(nn.Module):
@@ -1016,4 +898,4 @@ class AttentionConfig:
     value_dim: int | None = None
     gated: bool = True
     dropout_rate: float = 0.0  # Not used in inference
-    chunk_size: int = 512 # Chunk size for large sequences
+    chunk_size: int = 512  # Chunk size for large sequences

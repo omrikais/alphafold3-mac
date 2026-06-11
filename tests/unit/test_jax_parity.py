@@ -11,6 +11,10 @@ import numpy as np
 import mlx.core as mx
 from pathlib import Path
 
+from tests.unit.conftest import load_golden_data
+
+_JAX_GENERATE_CMD = "python scripts/generate_jax_model_references.py"
+
 
 class TestAttentionParity:
     """Test MLX attention parity with JAX."""
@@ -19,13 +23,7 @@ class TestAttentionParity:
 
     @pytest.fixture
     def golden_data(self):
-        """Load JAX reference data if available."""
-        if not self.GOLDEN_FILE.exists():
-            pytest.skip(
-                f"JAX reference not found: {self.GOLDEN_FILE}. "
-                "Run: python scripts/generate_jax_model_references.py"
-            )
-        return np.load(self.GOLDEN_FILE)
+        return load_golden_data(str(self.GOLDEN_FILE), _JAX_GENERATE_CMD)
 
     def test_attention_no_mask_parity(self, golden_data):
         """Test attention without mask matches JAX.
@@ -101,13 +99,7 @@ class TestPairFormerOpsParity:
 
     @pytest.fixture
     def golden_data(self):
-        """Load JAX reference data if available."""
-        if not self.GOLDEN_FILE.exists():
-            pytest.skip(
-                f"JAX reference not found: {self.GOLDEN_FILE}. "
-                "Run: python scripts/generate_jax_model_references.py"
-            )
-        return np.load(self.GOLDEN_FILE)
+        return load_golden_data(str(self.GOLDEN_FILE), _JAX_GENERATE_CMD)
 
     def test_linear_projection_parity(self, golden_data):
         """Test linear projection matches JAX."""
@@ -225,13 +217,7 @@ class TestDiffusionStepParity:
 
     @pytest.fixture
     def golden_data(self):
-        """Load JAX reference data if available."""
-        if not self.GOLDEN_FILE.exists():
-            pytest.skip(
-                f"JAX reference not found: {self.GOLDEN_FILE}. "
-                "Run: python scripts/generate_jax_model_references.py"
-            )
-        return np.load(self.GOLDEN_FILE)
+        return load_golden_data(str(self.GOLDEN_FILE), _JAX_GENERATE_CMD)
 
     def test_noise_embedding_parity(self, golden_data):
         """Test noise level embedding matches JAX."""
@@ -290,13 +276,7 @@ class TestConfidenceOpsParity:
 
     @pytest.fixture
     def golden_data(self):
-        """Load JAX reference data if available."""
-        if not self.GOLDEN_FILE.exists():
-            pytest.skip(
-                f"JAX reference not found: {self.GOLDEN_FILE}. "
-                "Run: python scripts/generate_jax_model_references.py"
-            )
-        return np.load(self.GOLDEN_FILE)
+        return load_golden_data(str(self.GOLDEN_FILE), _JAX_GENERATE_CMD)
 
     def test_plddt_computation_parity(self, golden_data):
         """Test pLDDT computation matches JAX."""

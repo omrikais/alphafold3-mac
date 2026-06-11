@@ -1,6 +1,6 @@
 {
   "version": "5.0.0",
-  "description": "JAX AF3 reference outputs for model validation",
+  "description": "JAX AF3 reference outputs for validation",
   "generated_at": "2026-02-04T08:37:55.197951",
   "platform": "Darwin",
   "python_version": "3.12.12 (main, Oct  9 2025, 11:07:00) [Clang 17.0.0 (clang-1700.6.3.2)]",
@@ -83,11 +83,11 @@
     "end_to_end_uses_real_af3": true,
     "uses_haiku_transform": true,
     "all_files_include_params": true,
-    "pairformer_validated": true,
-    "evoformer_validated": true,
-    "diffusion_validated": true,
-    "confidence_validated": true,
-    "end_to_end_validated": true
+    "sc002_pairformer_validated": true,
+    "sc002_evoformer_validated": true,
+    "sc002_diffusion_validated": true,
+    "sc002_confidence_validated": true,
+    "sc003_end_to_end_validated": true
   },
   "notes": [
     "PairFormer: Use ACTUAL AF3 PairFormerIteration from modules.py",
@@ -96,6 +96,6 @@
     "Batch inputs constructed via feat_batch.Batch with nested dataclasses",
     "tokamax stub provides pure JAX implementations when GPU unavailable",
     "All params saved with params/... keys for MLX weight loading",
-    "References are real AF3 outputs for numerical parity validation"
+    "References are real AF3 outputs for parity validation"
   ]
 }

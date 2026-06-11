@@ -43,7 +43,7 @@ def _check_platform() -> None:
         )
 
 
-# Only check platform when not explicitly skipped
+# Only check platform when not explicitly skipped (C-04)
 _check_platform()
 
 # Import subpackages — guarded so non-macOS imports with skip flag don't crash

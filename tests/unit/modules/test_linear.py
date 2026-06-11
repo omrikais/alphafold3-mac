@@ -1,6 +1,6 @@
 """Unit tests for Linear module.
 
-These tests validate the Linear implementation for.
+These tests validate the Linear implementation for .
 Tests are written first (TDD) to define expected behavior.
 """
 

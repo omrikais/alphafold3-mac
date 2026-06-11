@@ -6,7 +6,7 @@ platform.
 
 ## Purpose
 
-The policy requires that the data pipeline produces identical outputs on macOS
+requires that the data pipeline produces identical outputs on macOS
 compared to Linux. Since the data pipeline code (Python + C++ extensions) is
 unchanged between platforms, this validation ensures:
 

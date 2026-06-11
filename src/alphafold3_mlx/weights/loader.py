@@ -196,7 +196,7 @@ def load_mlx_params(
 def _validate_shapes(source_params: dict, converted_params: dict) -> None:
     """Validate that converted weight shapes exactly match source shapes.
 
-    This enforces: 0% shape mismatch tolerance.
+    This enforces 0% shape mismatch tolerance.
 
     Args:
         source_params: Original Haiku params (nested dict of JAX arrays).

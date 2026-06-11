@@ -95,27 +95,14 @@ class OuterProductMean(nn.Module):
             left = left * mask_expanded
             right = right * mask_expanded
 
-        # Compute outer product: left[i] outer right[j]
-        # [batch, seq_i, outer] outer [batch, seq_j, outer] -> [batch, seq_i, seq_j, outer*outer]
-        # Using einsum: "bio,bjo->bijo" then reshape
-        outer = mx.einsum("bio,bjo->bijo", left, right)
-        # outer shape: [batch, seq_i, seq_j, outer, outer]
-        # Actually einsum gives us outer product in last dim
-        # Let me fix: need explicit outer product
+        # Compute outer product via einsum (avoids materializing
+        # [batch, seq_i, seq_j, outer, outer] intermediate)
+        outer = mx.einsum("bio,bjp->bijop", left, right)
+        # [batch, seq_i, seq_j, outer_left, outer_right]
 
-        # Outer product via broadcasting
-        # left: [batch, seq, 1, outer] * right: [batch, 1, seq, outer]
-        # But we want: [batch, seq_i, seq_j, outer_left, outer_right]
-        left_expanded = left[:, :, None, :, None]  # [batch, seq_i, 1, outer, 1]
-        right_expanded = right[:, None, :, None, :]  # [batch, 1, seq_j, 1, outer]
-        outer = left_expanded * right_expanded  # [batch, seq_i, seq_j, outer, outer]
-
-        # Flatten outer dimensions
+        # Flatten outer dimensions and project to pair dimension
         batch_size, seq_i, seq_j, _, _ = outer.shape
         outer = outer.reshape(batch_size, seq_i, seq_j, -1)
-        # [batch, seq_i, seq_j, outer * outer]
-
-        # Project to pair dimension
         output = self.output_proj(outer)
 
         # Add to pair representation

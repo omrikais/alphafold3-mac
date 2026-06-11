@@ -1,7 +1,7 @@
 #!/bin/bash
 # Verify C++ extensions compile and work on macOS ARM64
 #
-# This script satisfies C++ extensions compile with Apple Clang.
+# This script verifies that C++ extensions compile with Apple Clang.
 # It builds the package and verifies all C++ submodules can be imported.
 #
 # Usage:
@@ -139,4 +139,4 @@ echo ""
 echo "=== Verification Complete ==="
 echo ""
 echo "C++ extensions compiled and imported successfully on macOS ARM64."
-echo "requirement satisfied."
+echo "C++ extension compilation requirement satisfied."

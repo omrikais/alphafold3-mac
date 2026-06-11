@@ -13,45 +13,7 @@ import mlx.core as mx
 from alphafold3_mlx.model import Model
 from alphafold3_mlx.core import ModelConfig, FeatureBatch
 from alphafold3_mlx.core.config import EvoformerConfig, DiffusionConfig, GlobalConfig
-
-
-def compute_rmsd(coords1: np.ndarray, coords2: np.ndarray) -> float:
-    """Compute RMSD between two coordinate sets.
-
-    Args:
-        coords1: First coordinate set [N, 3].
-        coords2: Second coordinate set [N, 3].
-
-    Returns:
-        RMSD value in Angstroms.
-    """
-    diff = coords1 - coords2
-    return float(np.sqrt(np.mean(np.sum(diff ** 2, axis=-1))))
-
-
-def create_minimal_batch(num_residues: int = 20, seed: int = 42) -> FeatureBatch:
-    """Create minimal feature batch for testing.
-
-    Args:
-        num_residues: Number of residues.
-        seed: Random seed.
-
-    Returns:
-        FeatureBatch for testing.
-    """
-    np.random.seed(seed)
-
-    # Create minimal feature dict
-    feature_dict = {
-        "aatype": np.random.randint(0, 20, size=num_residues).astype(np.int32),
-        "token_mask": np.ones(num_residues, dtype=np.float32),
-        "residue_index": np.arange(num_residues, dtype=np.int32),
-        "asym_id": np.zeros(num_residues, dtype=np.int32),
-        "entity_id": np.zeros(num_residues, dtype=np.int32),
-        "sym_id": np.zeros(num_residues, dtype=np.int32),
-    }
-
-    return FeatureBatch.from_numpy(feature_dict)
+from tests.integration.conftest import compute_rmsd, create_test_batch
 
 
 class TestEndToEndInference:
@@ -78,7 +40,7 @@ class TestEndToEndInference:
 
     def test_inference_runs(self, small_model):
         """Test that inference completes without errors."""
-        batch = create_minimal_batch(num_residues=10)
+        batch = create_test_batch(num_residues=10)
         key = mx.random.key(42)
 
         result = small_model(batch, key)
@@ -90,7 +52,7 @@ class TestEndToEndInference:
     def test_output_shapes(self, small_model):
         """Test that output shapes are correct."""
         num_residues = 10
-        batch = create_minimal_batch(num_residues=num_residues)
+        batch = create_test_batch(num_residues=num_residues)
         key = mx.random.key(42)
 
         result = small_model(batch, key)
@@ -105,7 +67,7 @@ class TestEndToEndInference:
 
     def test_no_nan_in_outputs(self, small_model):
         """Test that outputs don't contain NaN values."""
-        batch = create_minimal_batch(num_residues=8)
+        batch = create_test_batch(num_residues=8)
         key = mx.random.key(42)
 
         result = small_model(batch, key)
@@ -120,7 +82,7 @@ class TestEndToEndInference:
 
     def test_reproducibility(self, small_model):
         """Test that same key produces same output."""
-        batch = create_minimal_batch(num_residues=8)
+        batch = create_test_batch(num_residues=8)
 
         result1 = small_model(batch, mx.random.key(42))
         mx.eval(result1.atom_positions.positions)
@@ -166,7 +128,7 @@ class TestRMSDValidation:
         )
         model = Model(config)
 
-        batch = create_minimal_batch(num_residues=8)
+        batch = create_test_batch(num_residues=8)
         key = mx.random.key(42)
 
         result = model(batch, key)
@@ -198,7 +160,9 @@ class TestRMSDValidation:
         return np.load(golden_path)
 
     def test_golden_output_validity(self, golden_data):
-        """Validate end-to-end output structure and validity. requirement: Model produces valid structure with confidence scores.
+        """Validate end-to-end output structure and validity.
+
+        requirement: Model produces valid structure with confidence scores.
         """
         # Load golden inputs
         aatype = golden_data["aatype"]
@@ -215,7 +179,7 @@ class TestRMSDValidation:
             diffusion=DiffusionConfig(
                 num_steps=5,
                 num_samples=1,
-                num_transformer_blocks=4, # Must be divisible by super_block_size=4
+                num_transformer_blocks=4,  # Must be divisible by super_block_size=4
             ),
             global_config=GlobalConfig(use_compile=False),
             num_recycles=1,
@@ -258,11 +222,11 @@ class TestRMSDValidation:
 
         # Verify pLDDT in valid range
         assert np.all(plddt_np >= 0) and np.all(plddt_np <= 100), \
-            f"pLDDT out of range: [{plddt_np.min:.2f}, {plddt_np.max:.2f}]"
+            f"pLDDT out of range: [{plddt_np.min():.2f}, {plddt_np.max():.2f}]"
 
         # Verify coordinates are finite and reasonable
         assert np.all(np.isfinite(positions_np)), "Non-finite coordinates"
-        assert np.abs(positions_np).max < 1000, "Coordinates too large"
+        assert np.abs(positions_np).max() < 1000, "Coordinates too large"
 
 
 class TestConfidenceConsistency:
@@ -278,14 +242,14 @@ class TestConfidenceConsistency:
             diffusion=DiffusionConfig(
                 num_steps=5,
                 num_samples=2,
-                num_transformer_blocks=4, # Must be divisible by super_block_size=4
+                num_transformer_blocks=4,  # Must be divisible by super_block_size=4
             ),
             global_config=GlobalConfig(use_compile=False),
             num_recycles=1,
         )
         model = Model(config)
 
-        batch = create_minimal_batch(num_residues=10)
+        batch = create_test_batch(num_residues=10)
         key = mx.random.key(42)
 
         result = model(batch, key)
@@ -307,14 +271,14 @@ class TestConfidenceConsistency:
             diffusion=DiffusionConfig(
                 num_steps=5,
                 num_samples=2,
-                num_transformer_blocks=4, # Must be divisible by super_block_size=4
+                num_transformer_blocks=4,  # Must be divisible by super_block_size=4
             ),
             global_config=GlobalConfig(use_compile=False),
             num_recycles=1,
         )
         model = Model(config)
 
-        batch = create_minimal_batch(num_residues=10)
+        batch = create_test_batch(num_residues=10)
         key = mx.random.key(42)
 
         result = model(batch, key)

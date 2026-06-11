@@ -1,6 +1,6 @@
 # Validation Policy
 
-The validation policy defines the **validation subset** as unit + integration tests that do not
+defines the **validation subset** as unit + integration tests that do not
 require external dependencies or benchmarking infrastructure.
 
 ## Required validation run
@@ -11,7 +11,7 @@ Run the validation subset exactly as:
 source .venv/bin/activate && PYTHONPATH=src python3 -m pytest tests/unit tests/integration -m "not external_deps and not benchmark" -v
 ```
 
-The policy requires **zero skipped and zero deselected** tests in this run.
+requires **zero skipped and zero deselected** tests in this run.
 
 ## Optional runs (when dependencies are present)
 
@@ -29,7 +29,7 @@ source .venv/bin/activate && PYTHONPATH=src python3 -m pytest tests/validation -
 
 ## Script helper
 
-Use the helper script for the validation subset and optional runs:
+Use the helper script for the subset and optional runs:
 
 ```bash
 ./scripts/run_validation_tests.sh

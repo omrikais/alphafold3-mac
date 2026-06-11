@@ -6,7 +6,7 @@ as input for multiple iterations.
 
 Key implementation details:
 - Python for-loop (no jax.lax.fori_loop in MLX)
-- mx.eval at the end of each iteration to prevent graph explosion
+- mx.eval() at the end of each iteration to prevent graph explosion
 - Convergence tracking for stability testing
 """
 
@@ -165,7 +165,7 @@ def run_recycling_loop(
         single = single.astype(mx.float32)
         pair = pair.astype(mx.float32)
 
-        # mx.eval at end of each iteration
+        # mx.eval() at end of each iteration
         mx.eval(single, pair)
 
         # Progress callback

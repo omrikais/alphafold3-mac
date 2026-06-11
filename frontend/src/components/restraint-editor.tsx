@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,7 +33,7 @@ import type {
   RepulsiveRestraint,
   CandidateResidue,
 } from "@/lib/restraints";
-import { RESTRAINT_DEFAULTS } from "@/lib/restraints";
+import { RESTRAINT_DEFAULTS, countRestraints } from "@/lib/restraints";
 import type { FormEntity } from "@/lib/types";
 import { type ChainInfo, getAtomOptions } from "@/lib/residue-atoms";
 
@@ -449,15 +450,12 @@ export function RestraintEditor({
   onRestraintsChange,
   onGuidanceChange,
 }: Props) {
-  const chains = getChainInfo(entities);
-  const chainIds = getProteinChainIds(chains);
+  const chains = useMemo(() => getChainInfo(entities), [entities]);
+  const chainIds = useMemo(() => getProteinChainIds(chains), [chains]);
   const defaultChain = chainIds[0] || "A";
   const hasEnoughChains = chainIds.length >= 2;
 
-  const totalCount =
-    (restraints.distance?.length ?? 0) +
-    (restraints.contact?.length ?? 0) +
-    (restraints.repulsive?.length ?? 0);
+  const totalCount = countRestraints(restraints);
 
   // ── Distance ──
 
@@ -554,21 +552,17 @@ export function RestraintEditor({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-base">
-              Restraint-guided docking
-              {totalCount > 0 && (
-                <Badge variant="secondary" className="ml-2 text-[0.65rem]">
-                  {totalCount} restraint{totalCount > 1 ? "s" : ""}
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Spatial constraints to guide structure prediction.
-            </CardDescription>
-          </div>
-        </div>
+        <CardTitle className="text-base">
+          Restraint-guided docking
+          {totalCount > 0 && (
+            <Badge variant="secondary" className="ml-2 text-[0.65rem]">
+              {totalCount} restraint{totalCount > 1 ? "s" : ""}
+            </Badge>
+          )}
+        </CardTitle>
+        <CardDescription>
+          Spatial constraints to guide structure prediction.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         {!hasEnoughChains && (

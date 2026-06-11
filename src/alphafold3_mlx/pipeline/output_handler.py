@@ -1,6 +1,6 @@
 """Output handling for AlphaFold 3 MLX pipeline.
 
-This module provides output file management .
+This module provides output file management according to .
 
 Example:
     output_bundle = create_output_bundle(output_dir, num_samples=5)
@@ -13,7 +13,6 @@ import json
 import os
 import shutil
 import sys
-import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -342,49 +341,40 @@ def _generate_minimal_mmcif(structure_data: dict[str, Any], rank: int) -> str:
     return "\n".join(lines)
 
 
+def _write_json_file(data: dict[str, Any], output_path: Path) -> None:
+    """Write a dict as JSON to a file atomically.
+
+    Args:
+        data: Data dictionary to serialize.
+        output_path: Destination path.
+    """
+    with atomic_write(output_path) as temp_path:
+        with open(temp_path, "w") as f:
+            json.dump(data, f, indent=2)
+
+
 def write_confidence_scores(
     confidence_data: dict[str, Any],
     output_path: Path,
 ) -> None:
-    """Write confidence scores to JSON.
-
-    Args:
-        confidence_data: Confidence scores dictionary.
-        output_path: Path to write JSON file.
-    """
-    with atomic_write(output_path) as temp_path:
-        with open(temp_path, "w") as f:
-            json.dump(confidence_data, f, indent=2)
+    """Write confidence scores to JSON."""
+    _write_json_file(confidence_data, output_path)
 
 
 def write_timing(
     timing_data: dict[str, Any],
     output_path: Path,
 ) -> None:
-    """Write timing data to JSON.
-
-    Args:
-        timing_data: Timing data dictionary.
-        output_path: Path to write JSON file.
-    """
-    with atomic_write(output_path) as temp_path:
-        with open(temp_path, "w") as f:
-            json.dump(timing_data, f, indent=2)
+    """Write timing data to JSON."""
+    _write_json_file(timing_data, output_path)
 
 
 def write_ranking_debug(
     ranking_data: dict[str, Any],
     output_path: Path,
 ) -> None:
-    """Write ranking debug info to JSON.
-
-    Args:
-        ranking_data: Ranking debug data dictionary.
-        output_path: Path to write JSON file.
-    """
-    with atomic_write(output_path) as temp_path:
-        with open(temp_path, "w") as f:
-            json.dump(ranking_data, f, indent=2)
+    """Write ranking debug info to JSON."""
+    _write_json_file(ranking_data, output_path)
 
 
 def write_failure_log(
@@ -693,6 +683,17 @@ def _build_confidence_scores_dict(
     return confidence_data
 
 
+def _atom_distance_np(
+    positions: Any,
+    idx_a: tuple[int, int],
+    idx_b: tuple[int, int],
+) -> float:
+    """Euclidean distance between two atoms in a NumPy positions array."""
+    import numpy as np
+    diff = positions[idx_a[0], idx_a[1]] - positions[idx_b[0], idx_b[1]]
+    return float(np.sqrt(np.sum(diff * diff) + 1e-8))
+
+
 def _compute_restraint_satisfaction(
     np_result: dict[str, Any],
     sample_idx: int,
@@ -712,8 +713,6 @@ def _compute_restraint_satisfaction(
         Satisfaction dict with "distance", "contact", "repulsive" lists,
         or None if no restraints.
     """
-    import numpy as np
-
     positions = np_result["atom_positions"][sample_idx]  # [num_tokens, num_atoms, 3]
 
     resolved_distance = restraint_data.get("resolved_distance", [])
@@ -728,11 +727,7 @@ def _compute_restraint_satisfaction(
     if resolved_distance and restraint_config is not None:
         distance_sat = []
         for r, orig in zip(resolved_distance, restraint_config.distance):
-            pos_i = positions[r.atom_i_idx[0], r.atom_i_idx[1]]
-            pos_j = positions[r.atom_j_idx[0], r.atom_j_idx[1]]
-            diff = pos_i - pos_j
-            actual_dist = float(np.sqrt(np.sum(diff * diff) + 1e-8))
-            # Satisfied if within 3 * sigma
+            actual_dist = _atom_distance_np(positions, r.atom_i_idx, r.atom_j_idx)
             is_satisfied = abs(actual_dist - r.target_distance) <= 3 * r.sigma
             distance_sat.append({
                 "chain_i": orig.chain_i,
@@ -752,14 +747,11 @@ def _compute_restraint_satisfaction(
     if resolved_contact and restraint_config is not None:
         contact_sat = []
         for r, orig in zip(resolved_contact, restraint_config.contact):
-            pos_source = positions[r.source_atom_idx[0], r.source_atom_idx[1]]
             # Find closest candidate
             best_dist = float("inf")
             best_cand_idx = 0
             for ci, cand_idx in enumerate(r.candidate_atom_idxs):
-                pos_cand = positions[cand_idx[0], cand_idx[1]]
-                diff = pos_source - pos_cand
-                d = float(np.sqrt(np.sum(diff * diff) + 1e-8))
+                d = _atom_distance_np(positions, r.source_atom_idx, cand_idx)
                 if d < best_dist:
                     best_dist = d
                     best_cand_idx = ci
@@ -780,10 +772,7 @@ def _compute_restraint_satisfaction(
     if resolved_repulsive and restraint_config is not None:
         repulsive_sat = []
         for r, orig in zip(resolved_repulsive, restraint_config.repulsive):
-            pos_i = positions[r.atom_i_idx[0], r.atom_i_idx[1]]
-            pos_j = positions[r.atom_j_idx[0], r.atom_j_idx[1]]
-            diff = pos_i - pos_j
-            actual_dist = float(np.sqrt(np.sum(diff * diff) + 1e-8))
+            actual_dist = _atom_distance_np(positions, r.atom_i_idx, r.atom_j_idx)
             repulsive_sat.append({
                 "chain_i": orig.chain_i,
                 "residue_i": orig.residue_i,

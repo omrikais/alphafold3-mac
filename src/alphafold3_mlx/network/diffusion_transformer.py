@@ -2,7 +2,7 @@
 
 This implements the diffusion_transformer stack from AlphaFold 3 JAX:
 - adaptive_layernorm and adaptive_zero_init
-- self_attention and cross_attention (using MLX SDPA )
+- self_attention and cross_attention (using MLX SDPA - )
 - Transformer and CrossAttTransformer stacks (layer_stack semantics)
 
 Key MLX patterns:
@@ -40,22 +40,6 @@ def _float_to_additive_mask(float_mask: mx.array, mask_value: float = _MASK_VALU
     # When 1.0: mask_value * (1.0 - 1.0) = 0
     # When 0.0: mask_value * (0.0 - 1.0) = -mask_value
     return mask_value * (float_mask - 1.0)
-
-
-def _detect_fully_masked_rows(float_mask: mx.array) -> mx.array:
-    """Detect rows where all keys are masked.
-
-    Args:
-        float_mask: Float mask where 1.0=attend, 0.0=mask.
-            Shape: [..., seq_k]
-
-    Returns:
-        Boolean array where True indicates fully masked rows.
-        Shape: [..., 1] for broadcasting.
-    """
-    # A row is fully masked if no position has value > 0
-    has_valid_key = mx.any(float_mask > 0.5, axis=-1, keepdims=True)
-    return ~has_valid_key
 
 
 @dataclass

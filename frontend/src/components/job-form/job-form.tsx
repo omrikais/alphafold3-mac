@@ -21,7 +21,9 @@ import { Switch } from "@/components/ui/switch";
 import { AlertCircle, Eye, Loader2, Upload, Shuffle } from "lucide-react";
 import type { FormEntity, JobSubmission, StructureParseResult } from "@/lib/types";
 import type { RestraintConfig, GuidanceConfig } from "@/lib/restraints";
+import { countRestraints } from "@/lib/restraints";
 import { parseInputJson } from "@/lib/parse-input-json";
+import { entitiesToSequences } from "@/lib/entities";
 import { getJob, parseStructureFile } from "@/lib/api";
 import { useSubmitJob } from "@/hooks/use-jobs";
 import { useSystemStatus } from "@/hooks/use-system-status";
@@ -37,58 +39,6 @@ function generateJobName(): string {
   const noun = nouns[Math.floor(Math.random() * nouns.length)];
   const num = Math.floor(Math.random() * 100);
   return `${adj}-${noun}-${num}`;
-}
-
-function entitiesToSequences(entities: FormEntity[]): Record<string, unknown>[] {
-  return entities.map((entity) => {
-    switch (entity.type) {
-      case "proteinChain": {
-        const pc: Record<string, unknown> = {
-          sequence: entity.sequence,
-          count: entity.copies,
-        };
-        if (entity.modifications?.length) {
-          pc.modifications = entity.modifications.map((m) => ({
-            ptmType: m.type,
-            ptmPosition: m.position,
-          }));
-        }
-        return { proteinChain: pc };
-      }
-      case "rnaSequence":
-        return {
-          rnaSequence: {
-            sequence: entity.sequence,
-            count: entity.copies,
-          },
-        };
-      case "dnaSequence":
-        return {
-          dnaSequence: {
-            sequence: entity.sequence,
-            count: entity.copies,
-          },
-        };
-      case "ligand":
-        return {
-          ligand: {
-            ...(entity.smiles
-              ? { smiles: entity.smiles }
-              : { ligand: `CCD_${entity.ccdCode}` }),
-            count: entity.copies,
-          },
-        };
-      case "ion":
-        return {
-          ion: {
-            ion: entity.ccdCode || "MG",
-            count: entity.copies,
-          },
-        };
-      default:
-        return {};
-    }
-  });
 }
 
 export function JobForm() {
@@ -210,10 +160,7 @@ export function JobForm() {
       (runPipeline != null &&
         status != null &&
         runPipeline !== status.run_data_pipeline) ||
-      (restraints.distance?.length ?? 0) +
-        (restraints.contact?.length ?? 0) +
-        (restraints.repulsive?.length ?? 0) >
-        0 ||
+      countRestraints(restraints) > 0 ||
       Object.keys(guidance).length > 0;
 
     if (hasDraftChanges) {
@@ -254,10 +201,7 @@ export function JobForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadJobId, nextEntityId, router]);
 
-  const hasRestraints =
-    (restraints.distance?.length ?? 0) +
-    (restraints.contact?.length ?? 0) +
-    (restraints.repulsive?.length ?? 0) > 0;
+  const hasRestraints = countRestraints(restraints) > 0;
 
   const handleSubmit = useCallback((useCache: boolean) => {
     const actualSeed = autoSeed ? Math.floor(Math.random() * 2 ** 31) : seed;
@@ -293,13 +237,6 @@ export function JobForm() {
       setLoadError(null);
     },
     [nextEntityId],
-  );
-
-  const handlePdbResult = useCallback(
-    (result: StructureParseResult) => {
-      applyStructureResult(result);
-    },
-    [applyStructureResult],
   );
 
   const handleUploadFile = useCallback(
@@ -386,7 +323,7 @@ export function JobForm() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-1.5">
-              <PdbSearch onResult={handlePdbResult} disabled={isParsingFile} />
+              <PdbSearch onResult={applyStructureResult} disabled={isParsingFile} />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

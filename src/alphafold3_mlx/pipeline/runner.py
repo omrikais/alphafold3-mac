@@ -1,7 +1,7 @@
 """Inference runner for AlphaFold 3 MLX pipeline.
 
 This module provides the high-level InferenceRunner class that orchestrates
-the full inference pipeline .
+the full inference pipeline according to .
 
 Uses the real AlphaFold 3 data pipeline and featurisation modules.
 
@@ -149,12 +149,8 @@ class InferenceRunner:
             OutputBundle,
             create_output_directory,
             handle_existing_outputs,
-            write_mmcif_file,
-            write_confidence_scores,
-            write_timing,
-            write_ranking_debug,
         )
-        from alphafold3_mlx.pipeline.ranking import rank_samples, auto_detect_complex
+        from alphafold3_mlx.pipeline.ranking import auto_detect_complex
 
         logger.info("Starting inference pipeline")
         logger.debug(
@@ -226,14 +222,6 @@ class InferenceRunner:
             self._write_outputs(result, ranking, output_bundle, batch, stats)
             self.progress.on_stage_end("output_writing")
 
-            # Pass inference component timing to progress reporter for verbose output
-            if stats is not None:
-                self.progress.set_inference_timing(
-                    recycling_seconds=getattr(stats, "evoformer_duration_seconds", 0.0),
-                    diffusion_seconds=getattr(stats, "diffusion_duration_seconds", 0.0),
-                    confidence_seconds=getattr(stats, "confidence_duration_seconds", 0.0),
-                )
-
             # Complete
             self.progress.on_complete()
             logger.info("Inference pipeline completed successfully")
@@ -269,8 +257,8 @@ class InferenceRunner:
         Raises:
             InputError: If restraint validation fails.
         """
-        restraint_config = getattr(self.input_json, "_restraints", None)
-        guidance_config = getattr(self.input_json, "_guidance", None)
+        restraint_config = self.input_json.restraints
+        guidance_config = self.input_json.guidance
 
         if restraint_config is None or restraint_config.is_empty:
             return  # No restraints to validate
@@ -747,8 +735,8 @@ class InferenceRunner:
         """
         import numpy as np
 
-        restraint_config = getattr(self.input_json, "_restraints", None)
-        guidance_config = getattr(self.input_json, "_guidance", None)
+        restraint_config = self.input_json.restraints
+        guidance_config = self.input_json.guidance
 
         if restraint_config is None or restraint_config.is_empty:
             return None
@@ -889,7 +877,7 @@ class InferenceRunner:
         """Write all output files.
 
         Uses the centralized write_ranked_outputs function to ensure
-        structure files are written in ranked order.
+        structure files are written in ranked order per .
 
         Args:
             result: Model result.
@@ -919,7 +907,7 @@ class InferenceRunner:
 
         # Build restraint satisfaction data if restraints were used
         restraint_data = None
-        restraint_config = getattr(self.input_json, "_restraints", None)
+        restraint_config = self.input_json.restraints
         if restraint_config is not None and not restraint_config.is_empty:
             restraint_data = {
                 "resolved_distance": getattr(self, "_resolved_distance", []),

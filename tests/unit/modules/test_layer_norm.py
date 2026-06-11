@@ -1,6 +1,6 @@
 """Unit tests for LayerNorm module.
 
-These tests validate the LayerNorm implementation for.
+These tests validate the LayerNorm implementation for .
 Tests are written first (TDD) to define expected behavior.
 """
 

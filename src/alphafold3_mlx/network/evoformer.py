@@ -67,36 +67,6 @@ def _pseudo_beta_fn(
     return pseudo_beta, pseudo_beta_mask.astype(mx.float32)
 
 
-def _dgram_from_positions(
-    positions: mx.array,
-    min_bin: float = 3.25,
-    max_bin: float = 50.75,
-    num_bins: int = 39,
-) -> mx.array:
-    """Compute distogram from positions using squared distances.
-
-    Args:
-        positions: [num_res, 3] position coordinates.
-        min_bin: Left edge of first bin.
-        max_bin: Left edge of final bin.
-        num_bins: Number of bins.
-
-    Returns:
-        Distogram [num_res, num_res, num_bins].
-    """
-    lower_breaks = mx.linspace(min_bin, max_bin, num_bins)
-    lower_breaks = lower_breaks ** 2  # Squared distances
-    upper_breaks = mx.concatenate([lower_breaks[1:], mx.array([1e8])])
-
-    # Squared pairwise distances
-    diff = positions[:, None, :] - positions[None, :, :]  # [N, N, 3]
-    dist2 = mx.sum(diff ** 2, axis=-1, keepdims=True)  # [N, N, 1]
-
-    dgram = (dist2 > lower_breaks).astype(mx.float32) * (
-        dist2 < upper_breaks
-    ).astype(mx.float32)
-
-    return dgram
 
 
 def _make_backbone_rigid(
@@ -235,7 +205,7 @@ class EvoformerIteration(nn.Module):
     5. Pair row/column attention
     6. Pair transition
 
-    This is used when MSA features are available (conditional execution).
+    This is used when MSA features are available (conditional execution per ).
     """
 
     def __init__(
@@ -490,11 +460,14 @@ class SingleTemplateEmbedding(nn.Module):
         pseudo_beta_mask_2d = pseudo_beta_mask_2d * multichain_mask_2d
 
         # --- Distogram (39-bin squared distance) ---
-        dgram = _dgram_from_positions(
+        from alphafold3_mlx.network.template_modules import dgram_from_positions, DistogramFeaturesConfig
+        dgram = dgram_from_positions(
             pseudo_beta_positions,
-            min_bin=self.dgram_min_bin,
-            max_bin=self.dgram_max_bin,
-            num_bins=self.dgram_num_bins,
+            DistogramFeaturesConfig(
+                min_bin=self.dgram_min_bin,
+                max_bin=self.dgram_max_bin,
+                num_bins=self.dgram_num_bins,
+            ),
         )
         dgram = dgram * pseudo_beta_mask_2d[..., None]
         dgram = dgram.astype(dtype)
@@ -794,7 +767,7 @@ class Evoformer(nn.Module):
         self.single_output_norm = LayerNorm(c.seq_channel)
         self.pair_output_norm = LayerNorm(c.pair_channel)
 
-        # MSA stack (optional)
+        # T034c-d: MSA stack (optional)
         self.msa_channel = c.msa_channel
         self.num_msa_layers = c.num_msa_layers
         self.use_msa_stack = c.use_msa_stack
@@ -865,7 +838,7 @@ class Evoformer(nn.Module):
             bond_features: Optional bond features. Shape: [batch, seq, seq, 1]
             msa_features: Optional MSA features. Shape: [batch, num_seqs, seq, msa_channel]
             msa_mask: Optional MSA mask. Shape: [batch, num_seqs, seq]
-            return_intermediates: If True, return intermediate layer outputs.
+            return_intermediates: If True, return intermediate layer outputs for .
 
         Returns:
             If return_intermediates is False:
@@ -1041,7 +1014,7 @@ class Evoformer(nn.Module):
         return single, pair
 
     def set_template_enabled(self, enabled: bool) -> None:
-        """Enable or disable template processing.
+        """Enable or disable template processing (- ).
 
         Args:
             enabled: Whether to use template features.

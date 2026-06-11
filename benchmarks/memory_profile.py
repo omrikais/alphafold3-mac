@@ -101,20 +101,19 @@ def profile_inference(
 
         # Allocate pair representation
         pair = mx.zeros((1, num_residues, num_residues, pair_dim))
-        mx.eval(pair)
 
         # Allocate single representation
         single = mx.zeros((1, num_residues, seq_dim))
-        mx.eval(single)
 
         # Allocate coordinate samples
         coords = mx.zeros((num_samples, 1, num_residues, 37, 3))
-        mx.eval(coords)
 
         # Allocate attention intermediates (approximation)
         num_heads = 4
         attn_logits = mx.zeros((1, num_heads, num_residues, num_residues))
-        mx.eval(attn_logits)
+
+        # Evaluate all allocations in one batch
+        mx.eval(pair, single, coords, attn_logits)
 
         # Check for NaN/Inf (sanity check)
         has_nan = bool(mx.any(mx.isnan(pair)).item())

@@ -380,7 +380,7 @@ class TestDiffusionPeriodicEval:
     def test_eval_frequency(self):
         """Verify that diffusion head is designed for periodic evaluation.
 
-        The implementation should call mx.eval every 10 steps.
+        The implementation should call mx.eval() every 10 steps.
         This is a documentation test - actual memory behavior tested separately.
         """
         config = DiffusionConfig(num_steps=200)
@@ -396,14 +396,8 @@ class TestDiffusionGoldenValidation:
 
     @pytest.fixture
     def golden_data(self):
-        """Load golden reference data if available."""
-        from pathlib import Path
-        import numpy as np
-        golden_path = Path(self.GOLDEN_FILE)
-        if not golden_path.exists():
-            pytest.skip(f"Golden reference not found: {golden_path}. "
-                       "Run: python scripts/generate_model_reference_outputs.py")
-        return np.load(golden_path)
+        from tests.unit.conftest import load_golden_data
+        return load_golden_data(self.GOLDEN_FILE)
 
     def test_golden_comparison(self, golden_data):
         """Compare diffusion step output against golden reference.

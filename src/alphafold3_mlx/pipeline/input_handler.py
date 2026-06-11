@@ -1,6 +1,6 @@
 """Input handling for AlphaFold 3 MLX pipeline.
 
-This module provides JSON input parsing and validation .
+This module provides JSON input parsing and validation for AF3-format inputs.
 
 Uses alphafold3.common.folding_input.Input.from_json for parsing to ensure
 compatibility with the official AF3 input format.
@@ -16,12 +16,16 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Literal
 
+import logging
+
 from alphafold3.common import folding_input
 from alphafold3_mlx.pipeline.errors import InputError, ResourceError
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -77,61 +81,10 @@ class Sequence:
     def _get_valid_chars(self) -> set[str]:
         """Get valid characters for this chain type."""
         if self.chain_type == "protein":
-            return set("ARNDCQEGHILKMFPSTWYVXUBZJO") # Standard + ambiguous
+            return set("ARNDCQEGHILKMFPSTWYVXUBZJO")  # Standard + ambiguous
         elif self.chain_type in ("rna", "dna"):
-            return set("ACGTURYSWKMBDHVN") # Standard + IUPAC ambiguous
-        elif self.chain_type == "ligand":
-            return set() # Ligands use SMILES, different validation
+            return set("ACGTURYSWKMBDHVN")  # Standard + IUPAC ambiguous
         return set()
-
-
-@dataclass
-class InputJSON:
-    """Parsed AF3 input file.
-
-    Attributes:
-        name: Job name / identifier.
-        sequences: List of chains in the input.
-        model_seeds: Random seeds for inference.
-        msa_paths: Pre-computed MSA file paths by chain ID.
-        template_paths: Pre-computed template file paths.
-    """
-
-    name: str
-    sequences: list[Sequence]
-    model_seeds: list[int]
-    msa_paths: dict[str, Path] | None = None
-    template_paths: dict[str, Path] | None = None
-
-    def __post_init__(self) -> None:
-        """Validate input after initialization."""
-        if not self.sequences:
-            raise InputError("At least one sequence is required")
-
-        # Validate unique chain IDs
-        chain_ids = [s.chain_id for s in self.sequences]
-        if len(chain_ids) != len(set(chain_ids)):
-            raise InputError("Duplicate chain IDs found")
-
-        # Validate seeds
-        for seed in self.model_seeds:
-            if seed < 0:
-                raise InputError(f"Model seed must be non-negative, got {seed}")
-
-    @property
-    def total_residues(self) -> int:
-        """Total number of residues across all chains."""
-        return sum(len(s.sequence) for s in self.sequences)
-
-    @property
-    def is_complex(self) -> bool:
-        """Whether this is a multi-chain complex."""
-        return len(self.sequences) > 1
-
-    @property
-    def chain_ids(self) -> list[str]:
-        """List of all chain identifiers."""
-        return [s.chain_id for s in self.sequences]
 
 
 class FoldInput:
@@ -280,8 +233,8 @@ class FoldInput:
             elif isinstance(chain, folding_input.DnaChain):
                 modifications = [
                     Modification(position=mod[1], modification_type=mod[0])
-                    for mod in chain.modifications
-                ] if chain.modifications else None
+                    for mod in chain.modifications()
+                ] if chain.modifications() else None
                 result.append(Sequence(
                     sequence=chain.sequence,
                     chain_type="dna",
@@ -331,6 +284,74 @@ class FoldInput:
 InputJSON = FoldInput
 
 
+def _read_json_file(path: Path) -> tuple[Any, str]:
+    """Read and parse a JSON file.
+
+    Args:
+        path: Path to JSON file.
+
+    Returns:
+        Tuple of (parsed JSON object, raw JSON string).
+
+    Raises:
+        InputError: If file cannot be read or parsed.
+    """
+    try:
+        with open(path, "r") as f:
+            json_str = f.read()
+    except (IOError, FileNotFoundError) as e:
+        raise InputError(f"Failed to read file {path}: {e}")
+
+    try:
+        raw_json = json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise InputError(f"Invalid JSON at line {e.lineno}, column {e.colno}: {e.msg}")
+
+    return raw_json, json_str
+
+
+def _extract_restraint_guidance(
+    raw_json: dict[str, Any],
+    context: str,
+) -> tuple[Any, Any]:
+    """Extract and parse restraint/guidance configs from a JSON dict.
+
+    Pops 'restraints' and 'guidance' keys from raw_json (mutating it)
+    before passing to the AF3 parser, which rejects unknown keys.
+
+    Args:
+        raw_json: Parsed JSON dict (mutated: restraints/guidance keys popped).
+        context: Label for error messages (e.g. "input JSON", "fold job 3").
+
+    Returns:
+        Tuple of (RestraintConfig | None, GuidanceConfig | None).
+
+    Raises:
+        InputError: If restraint/guidance parsing fails.
+    """
+    restraints_dict = raw_json.pop("restraints", None)
+    guidance_dict = raw_json.pop("guidance", None)
+
+    restraint_config = None
+    guidance_config = None
+
+    if restraints_dict is not None:
+        from alphafold3_mlx.restraints.types import restraint_config_from_dict
+        try:
+            restraint_config = restraint_config_from_dict(restraints_dict)
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
+            raise InputError(f"Invalid restraints in {context}: {e}")
+
+    if guidance_dict is not None:
+        from alphafold3_mlx.restraints.types import guidance_config_from_dict
+        try:
+            guidance_config = guidance_config_from_dict(guidance_dict)
+        except (ValueError, TypeError) as e:
+            raise InputError(f"Invalid guidance in {context}: {e}")
+
+    return restraint_config, guidance_config
+
+
 def parse_input_json(input_path: Path) -> FoldInput:
     """Parse AF3-format JSON input file.
 
@@ -352,19 +373,7 @@ def parse_input_json(input_path: Path) -> FoldInput:
     Raises:
         InputError: If file cannot be parsed or is invalid.
     """
-    if not input_path.exists():
-        raise InputError(f"Input file not found: {input_path}")
-
-    try:
-        with open(input_path, "r") as f:
-            json_str = f.read()
-    except IOError as e:
-        raise InputError(f"Failed to read input file: {e}")
-
-    try:
-        raw_json = json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise InputError(f"Invalid JSON at line {e.lineno}, column {e.colno}: {e.msg}")
+    raw_json, json_str = _read_json_file(input_path)
 
     # Handle AlphaFold Server list format (top-level list of fold jobs)
     if isinstance(raw_json, list):
@@ -384,30 +393,14 @@ def parse_input_json(input_path: Path) -> FoldInput:
             f"Expected a JSON object at top level, got {type(raw_json).__name__}"
         )
 
-    # Extract restraints and guidance BEFORE passing to AF3 parser
-    # (upstream folding_input.Input rejects unknown keys)
-    restraints_dict = raw_json.pop("restraints", None)
-    guidance_dict = raw_json.pop("guidance", None)
+    # Extract and parse restraints/guidance BEFORE passing to AF3 parser
+    restraint_config, guidance_config = _extract_restraint_guidance(
+        raw_json, "input JSON",
+    )
 
     # Re-serialize JSON string after popping restraint keys
-    if restraints_dict is not None or guidance_dict is not None:
+    if restraint_config is not None or guidance_config is not None:
         json_str = json.dumps(raw_json)
-
-    # Parse restraint/guidance configs if present
-    restraint_config = None
-    guidance_config = None
-    if restraints_dict is not None:
-        from alphafold3_mlx.restraints.types import restraint_config_from_dict
-        try:
-            restraint_config = restraint_config_from_dict(restraints_dict)
-        except (ValueError, TypeError, KeyError, AttributeError) as e:
-            raise InputError(f"Invalid restraints in input JSON: {e}")
-    if guidance_dict is not None:
-        from alphafold3_mlx.restraints.types import guidance_config_from_dict
-        try:
-            guidance_config = guidance_config_from_dict(guidance_dict)
-        except (ValueError, TypeError) as e:
-            raise InputError(f"Invalid guidance in input JSON: {e}")
 
     # Try to detect and parse based on format
     af3_input = _parse_any_format(raw_json, json_str, input_path)
@@ -421,13 +414,11 @@ def _strip_unsupported_server_fields(raw_json: dict[str, Any]) -> dict[str, Any]
     the local parser rejects. We strip them so users can paste JSON directly
     from the server without editing.
     """
-    import copy
-    cleaned = copy.deepcopy(raw_json)
-    for seq in cleaned.get("sequences", []):
+    for seq in raw_json.get("sequences", []):
         for entity_key in ("proteinChain", "rnaSequence", "dnaSequence", "ligand", "ion"):
             if entity_key in seq:
                 seq[entity_key].pop("maxTemplateDate", None)
-    return cleaned
+    return raw_json
 
 
 def _parse_any_format(
@@ -587,126 +578,6 @@ def _convert_simple_format(data: dict[str, Any]) -> folding_input.Input:
         raise InputError(f"Invalid input: {e}")
 
 
-def _parse_input_dict(data: dict[str, Any]) -> InputJSON:
-    """Parse input from dictionary.
-
-    Args:
-        data: Input data dictionary.
-
-    Returns:
-        Parsed InputJSON instance.
-
-    Raises:
-        InputError: If required fields are missing or invalid.
-    """
-    # Check for required fields and aggregate missing ones
-    missing_fields = []
-    if "sequences" not in data or not data.get("sequences"):
-        missing_fields.append("sequences")
-
-    if missing_fields:
-        raise InputError(f"Missing required fields in input: {', '.join(missing_fields)}")
-
-    # Extract name
-    name = data.get("name", "unnamed")
-
-    # Extract seeds (AF3 format uses "modelSeeds")
-    model_seeds = data.get("modelSeeds", data.get("model_seeds", [42]))
-    if not isinstance(model_seeds, list):
-        model_seeds = [model_seeds]
-
-    # Extract sequences
-    sequences_data = data["sequences"]
-
-    sequences = []
-    for i, seq_entry in enumerate(sequences_data):
-        seq = _parse_sequence_entry(seq_entry, default_chain_id=chr(ord("A") + i))
-        sequences.append(seq)
-
-    # Extract optional MSA/template paths
-    msa_paths = None
-    if "msa_paths" in data:
-        msa_paths = {k: Path(v) for k, v in data["msa_paths"].items()}
-
-    template_paths = None
-    if "template_paths" in data:
-        template_paths = {k: Path(v) for k, v in data["template_paths"].items()}
-
-    return InputJSON(
-        name=name,
-        sequences=sequences,
-        model_seeds=model_seeds,
-        msa_paths=msa_paths,
-        template_paths=template_paths,
-    )
-
-
-def _parse_sequence_entry(entry: dict[str, Any], default_chain_id: str) -> Sequence:
-    """Parse a single sequence entry from AF3 JSON format.
-
-    AF3 format uses nested structure:
-    {
-        "protein": {"id": "A", "sequence": "MKTAY..."},
-        ...
-    }
-
-    Args:
-        entry: Sequence entry from JSON.
-        default_chain_id: Default chain ID if not specified.
-
-    Returns:
-        Parsed Sequence instance.
-
-    Raises:
-        InputError: If entry is invalid.
-    """
-    # AF3 format: {"protein": {...}} or {"rna": {...}} etc.
-    chain_types = ["protein", "rna", "dna", "ligand"]
-
-    for chain_type in chain_types:
-        if chain_type in entry:
-            chain_data = entry[chain_type]
-            sequence = chain_data.get("sequence", "")
-            chain_id = chain_data.get("id", default_chain_id)
-
-            # Parse modifications if present
-            modifications = None
-            if "modifications" in chain_data:
-                modifications = [
-                    Modification(position=m["position"], modification_type=m["type"])
-                    for m in chain_data["modifications"]
-                ]
-
-            return Sequence(
-                sequence=sequence,
-                chain_type=chain_type, # type: ignore
-                chain_id=chain_id,
-                modifications=modifications,
-            )
-
-    # Fallback: simple format with just sequence string
-    if "sequence" in entry:
-        return Sequence(
-            sequence=entry["sequence"],
-            chain_type="protein",
-            chain_id=entry.get("id", entry.get("chain_id", default_chain_id)),
-        )
-
-    raise InputError(f"Invalid sequence entry format: {entry}")
-
-
-def parse_multichain_sequences(fold_input: FoldInput) -> list[Sequence]:
-    """Parse multi-chain complex inputs.
-
-    Args:
-        fold_input: Parsed fold input.
-
-    Returns:
-        List of sequences with proper chain IDs.
-    """
-    return fold_input.sequences
-
-
 def load_fold_inputs(input_path: Path) -> Iterator[FoldInput]:
     """Load multiple fold inputs from an AlphaFold Server JSON file.
 
@@ -736,19 +607,7 @@ def load_fold_inputs(input_path: Path) -> Iterator[FoldInput]:
             result = run_inference(fold_input)
             # fold_input.restraints and fold_input.guidance are available
     """
-    if not input_path.exists():
-        raise InputError(f"Input file not found: {input_path}")
-
-    try:
-        with open(input_path, "r") as f:
-            json_str = f.read()
-    except IOError as e:
-        raise InputError(f"Failed to read input file: {e}")
-
-    try:
-        raw_json = json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise InputError(f"Invalid JSON at line {e.lineno}, column {e.colno}: {e.msg}")
+    raw_json, json_str = _read_json_file(input_path)
 
     # Handle AlphaFold Server list format (top-level list of fold jobs)
     if isinstance(raw_json, list):
@@ -760,31 +619,9 @@ def load_fold_inputs(input_path: Path) -> Iterator[FoldInput]:
                     f"Fold job {fold_job_idx} in {input_path} is not a JSON object"
                 )
             try:
-                # Extract restraints and guidance BEFORE parsing
-                # (upstream folding_input.Input rejects unknown keys)
-                restraints_dict = fold_job.pop("restraints", None)
-                guidance_dict = fold_job.pop("guidance", None)
-
-                # Parse restraint/guidance configs if present
-                restraint_config = None
-                guidance_config = None
-                if restraints_dict is not None:
-                    from alphafold3_mlx.restraints.types import restraint_config_from_dict
-                    try:
-                        restraint_config = restraint_config_from_dict(restraints_dict)
-                    except (ValueError, TypeError, KeyError, AttributeError) as e:
-                        raise InputError(
-                            f"Invalid restraints in fold job {fold_job_idx}: {e}"
-                        )
-                if guidance_dict is not None:
-                    from alphafold3_mlx.restraints.types import guidance_config_from_dict
-                    try:
-                        guidance_config = guidance_config_from_dict(guidance_dict)
-                    except (ValueError, TypeError) as e:
-                        raise InputError(
-                            f"Invalid guidance in fold job {fold_job_idx}: {e}"
-                        )
-
+                restraint_config, guidance_config = _extract_restraint_guidance(
+                    fold_job, f"fold job {fold_job_idx}",
+                )
                 af3_input = folding_input.Input.from_alphafoldserver_fold_job(fold_job)
                 yield FoldInput(af3_input, restraints=restraint_config, guidance=guidance_config)
             except ValueError as e:
@@ -798,29 +635,13 @@ def load_fold_inputs(input_path: Path) -> Iterator[FoldInput]:
                 f"Expected a JSON object or array in {input_path}, "
                 f"got {type(raw_json).__name__}"
             )
-        # Extract restraints and guidance BEFORE parsing
-        restraints_dict = raw_json.pop("restraints", None)
-        guidance_dict = raw_json.pop("guidance", None)
+        restraint_config, guidance_config = _extract_restraint_guidance(
+            raw_json, "input JSON",
+        )
 
         # Re-serialize JSON string after popping restraint keys
-        if restraints_dict is not None or guidance_dict is not None:
+        if restraint_config is not None or guidance_config is not None:
             json_str = json.dumps(raw_json)
-
-        # Parse restraint/guidance configs if present
-        restraint_config = None
-        guidance_config = None
-        if restraints_dict is not None:
-            from alphafold3_mlx.restraints.types import restraint_config_from_dict
-            try:
-                restraint_config = restraint_config_from_dict(restraints_dict)
-            except (ValueError, TypeError, KeyError, AttributeError) as e:
-                raise InputError(f"Invalid restraints in input JSON: {e}")
-        if guidance_dict is not None:
-            from alphafold3_mlx.restraints.types import guidance_config_from_dict
-            try:
-                guidance_config = guidance_config_from_dict(guidance_dict)
-            except (ValueError, TypeError) as e:
-                raise InputError(f"Invalid guidance in input JSON: {e}")
 
         af3_input = _parse_any_format(raw_json, json_str, input_path)
         yield FoldInput(af3_input, restraints=restraint_config, guidance=guidance_config)
@@ -925,7 +746,7 @@ def check_memory_available(
                 page_size = os.sysconf('SC_PAGE_SIZE')
                 available = (pages * page_size) / (1024**3)
             except (ValueError, OSError, AttributeError):
-                available = 32.0 # Conservative fallback
+                available = 32.0  # Conservative fallback
         threshold = available * safety_factor
 
         if estimated > threshold:
@@ -966,9 +787,6 @@ def load_restraints_file(restraints_path: Path) -> tuple[Any, Any]:
     Raises:
         InputError: If the file cannot be read, parsed, or is invalid.
     """
-    if not restraints_path.exists():
-        raise InputError(f"Restraints file not found: {restraints_path}")
-
     try:
         with open(restraints_path, "r") as f:
             data = json.load(f)
@@ -977,6 +795,8 @@ def load_restraints_file(restraints_path: Path) -> tuple[Any, Any]:
             f"Invalid JSON in restraints file {restraints_path}: "
             f"line {e.lineno}, column {e.colno}: {e.msg}"
         )
+    except FileNotFoundError:
+        raise InputError(f"Restraints file not found: {restraints_path}")
     except IOError as e:
         raise InputError(f"Failed to read restraints file: {e}")
 
@@ -996,28 +816,10 @@ def load_restraints_file(restraints_path: Path) -> tuple[Any, Any]:
             f"{sorted(unexpected)}. Only 'restraints' and 'guidance' are allowed."
         )
 
-    from alphafold3_mlx.restraints.types import (
-        guidance_config_from_dict,
-        restraint_config_from_dict,
+    restraint_config, guidance_config = _extract_restraint_guidance(
+        data, str(restraints_path),
     )
-
-    restraint_config = None
-    guidance_config = None
-
-    if "restraints" in data:
-        try:
-            restraint_config = restraint_config_from_dict(data["restraints"])
-        except (ValueError, TypeError, KeyError, AttributeError) as e:
-            raise InputError(
-                f"Invalid restraints in {restraints_path}: {e}"
-            )
-    if "guidance" in data:
-        try:
-            guidance_config = guidance_config_from_dict(data["guidance"])
-        except (ValueError, TypeError) as e:
-            raise InputError(
-                f"Invalid guidance in {restraints_path}: {e}"
-            )
+    # _extract_restraint_guidance pops keys; that's fine since we validated them above.
 
     return restraint_config, guidance_config
 

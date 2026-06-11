@@ -1,4 +1,4 @@
-"""Unit tests for restraint reference validation.
+"""Unit tests for restraint reference validation (— ).
 
 Tests that invalid restraint references (nonexistent chain, out-of-range
 residue, invalid atom name) are caught during input validation with

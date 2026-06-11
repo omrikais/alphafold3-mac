@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from typing import Any
 
@@ -104,14 +103,17 @@ async def create_job(submission: JobSubmission, request: Request) -> JobCreated:
 @router.get("", response_model=PaginatedJobs)
 async def list_jobs(
     request: Request,
-    status: str | None = Query(None, description="Filter by status"),
+    status: JobStatus | None = Query(None, description="Filter by status"),
     search: str | None = Query(None, description="Search by name"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> PaginatedJobs:
     """List jobs with optional filters and pagination."""
     store = request.app.state.job_store
-    return store.list_jobs(status=status, search=search, page=page, page_size=page_size)
+    return store.list_jobs(
+        status=status.value if status else None,
+        search=search, page=page, page_size=page_size,
+    )
 
 
 @router.get("/{job_id}", response_model=JobDetail)

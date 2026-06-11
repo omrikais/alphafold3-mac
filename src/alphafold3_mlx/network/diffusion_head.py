@@ -18,6 +18,7 @@ from alphafold3_mlx.core.validation import check_nan
 from alphafold3_mlx.geometry import Vec3Array, Rot3Array, random_gaussian_vector
 from alphafold3_mlx.modules import Linear, LayerNorm
 from alphafold3_mlx.network import featurization
+from alphafold3_mlx.network.featurization import _mask_mean
 from alphafold3_mlx.network.noise_level_embeddings import noise_embeddings
 from alphafold3_mlx.network.noise_schedule import karras_schedule
 from alphafold3_mlx.network.diffusion_transformer import (
@@ -34,12 +35,6 @@ from alphafold3_mlx.network.atom_cross_attention import (
 if TYPE_CHECKING:
     from alphafold3_mlx.core.config import DiffusionConfig, GlobalConfig
     from alphafold3_mlx.feat_batch import Batch
-
-
-def _mask_mean(mask: mx.array, value: mx.array, axis, keepdims, eps=1e-6) -> mx.array:
-    numerator = mx.sum(mask * value, axis=axis, keepdims=keepdims)
-    denom = mx.sum(mask, axis=axis, keepdims=keepdims)
-    return numerator / (denom + eps)
 
 
 def random_rotation(key: mx.array) -> Rot3Array:
@@ -540,7 +535,7 @@ class DiffusionHead(nn.Module):
 
         noise_level_prev = mx.broadcast_to(noise_levels[0], (num_samples,))
 
-        # Checkpoint capture - use list to avoid .copy on MLX arrays
+        # Checkpoint capture - use list to avoid .copy() on MLX arrays
         checkpoints = [] if capture_checkpoints else None
 
         for step in range(1, num_steps + 1):

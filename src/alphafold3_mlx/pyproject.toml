@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alphafold3-mlx"
+version = "0.1.0"
+description = "Apple Silicon port of AlphaFold 3 using MLX"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "CC-BY-NC-SA-4.0"}
+dependencies = [
+    "mlx>=0.10.0",
+    "jax",
+    "numpy>=1.21",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]

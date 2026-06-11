@@ -1,6 +1,6 @@
 """Unit tests for Vec3Array struct-of-arrays.
 
-These tests validate the Vec3Array implementation for.
+These tests validate the Vec3Array implementation for .
 Tests are written first (TDD) to define expected behavior.
 """
 
@@ -546,7 +546,7 @@ class TestVec3ArrayFactoryMethods:
             assert v.dtype == dtype
 
     def test_zeros_large_batch(self):
-        """Test Vec3Array.zeros with large batch for scale."""
+        """Test Vec3Array.zeros() with large batch for scale."""
         from alphafold3_mlx.geometry import Vec3Array
 
         # scale: [1, 5000]

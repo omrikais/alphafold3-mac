@@ -104,7 +104,7 @@ class TestFullPipelineParity:
     def test_full_pipeline_msa_search_parity(self):
         """Test full MSA search pipeline produces identical output to Linux reference.
 
-        This test validates  by running the complete pipeline:
+        This test validates by running the complete pipeline:
         MSA search (jackhmmer) → A3M parsing → featurization.
         """
         ref_file = REFERENCE_OUTPUTS_DIR / "full_pipeline_reference.npz"

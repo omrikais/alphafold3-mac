@@ -605,7 +605,7 @@ def _relative_error(a: np.ndarray, b: np.ndarray, eps: float = 1e-8) -> float:
 
 
 class TestEndToEndJAXParity:
-    """End-to-end RMSD parity vs JAX AF3 outputs."""
+    """end-to-end RMSD parity vs JAX AF3 outputs."""
 
     def test_end_to_end_rmsd_and_confidence(self):
         if not REF_PATH.exists():
@@ -866,7 +866,7 @@ class TestEndToEndJAXParity:
             pytest.skip("No valid backbone atoms for RMSD comparison")
 
         rmsd = _compute_backbone_rmsd(pred_bb, ref_bb, mask_bb)
-        assert rmsd < RMSD_TOL, f"FAILED: RMSD {rmsd:.4f}Å exceeds {RMSD_TOL:.2f}Å"
+        assert rmsd < RMSD_TOL, f"FAILED: RMSD{rmsd:.4f}Å exceeds {RMSD_TOL:.2f}Å"
 
         # Confidence comparisons
         plddt_mlx = np.array(confidence.plddt)

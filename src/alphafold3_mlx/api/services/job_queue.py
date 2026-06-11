@@ -117,6 +117,8 @@ class JobQueue:
             self._pending_count = max(0, self._pending_count - 1)
             self.store.update_status(job_id, JobStatus.CANCELLED)
             self.hub.publish_cancelled(job_id)
+            # Note: don't pop the flag here — the worker still needs to see it
+            # when it dequeues this job_id to skip processing.
             return True
 
         return False

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer } from "react";
 import { connectJobProgress } from "@/lib/ws";
 import type { WSMessage } from "@/lib/types";
 
@@ -82,7 +82,6 @@ function progressReducer(state: ProgressState, action: ProgressAction): Progress
 
 export function useJobProgress(jobId: string | null): ProgressState {
   const [state, dispatch] = useReducer(progressReducer, INITIAL);
-  const connRef = useRef<{ close: () => void } | null>(null);
 
   useEffect(() => {
     dispatch({ type: "reset" });
@@ -91,8 +90,6 @@ export function useJobProgress(jobId: string | null): ProgressState {
     const conn = connectJobProgress(jobId, (msg: WSMessage) => {
       dispatch({ type: "message", message: msg });
     });
-
-    connRef.current = conn;
 
     return () => {
       conn.close();

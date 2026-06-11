@@ -1864,9 +1864,28 @@ class Model(nn.Module):
         # Capture model state for compilation
         evoformer_state = [self.evoformer.state]
 
-        # Create compiled Evoformer function
+        # Create compiled Evoformer function.
+        # TokenFeatures is a dataclass that mx.compile cannot handle as an
+        # argument (only arrays and constants are allowed).  We decompose it
+        # into individual arrays in a non-compiled wrapper, pass those to the
+        # compiled core, and reconstruct the dataclass inside the compiled
+        # boundary where it is just a Python wrapper around traced arrays.
         @partial(mx.compile, inputs=evoformer_state, outputs=evoformer_state)
-        def compiled_evoformer(single, pair, residue_index, asym_id, seq_mask, pair_mask, **kwargs):
+        def _compiled_evoformer_core(
+            single, pair, residue_index, asym_id, seq_mask, pair_mask, **kwargs
+        ):
+            # Reconstruct TokenFeatures from decomposed arrays if present
+            _tf_token_index = kwargs.pop('_tf_token_index', None)
+            if _tf_token_index is not None:
+                from alphafold3_mlx.feat_batch import TokenFeatures as _TF
+                kwargs['token_features'] = _TF(
+                    token_index=_tf_token_index,
+                    residue_index=kwargs.pop('_tf_residue_index'),
+                    asym_id=kwargs.pop('_tf_asym_id'),
+                    entity_id=kwargs.pop('_tf_entity_id'),
+                    sym_id=kwargs.pop('_tf_sym_id'),
+                    mask=kwargs.pop('_tf_mask'),
+                )
             return self.evoformer(
                 single=single,
                 pair=pair,
@@ -1875,6 +1894,20 @@ class Model(nn.Module):
                 seq_mask=seq_mask,
                 pair_mask=pair_mask,
                 **kwargs,
+            )
+
+        def compiled_evoformer(single, pair, residue_index, asym_id, seq_mask, pair_mask, **kwargs):
+            """Wrapper that decomposes TokenFeatures for mx.compile compatibility."""
+            tf = kwargs.pop('token_features', None)
+            if tf is not None:
+                kwargs['_tf_token_index'] = tf.token_index
+                kwargs['_tf_residue_index'] = tf.residue_index
+                kwargs['_tf_asym_id'] = tf.asym_id
+                kwargs['_tf_entity_id'] = tf.entity_id
+                kwargs['_tf_sym_id'] = tf.sym_id
+                kwargs['_tf_mask'] = tf.mask
+            return _compiled_evoformer_core(
+                single, pair, residue_index, asym_id, seq_mask, pair_mask, **kwargs,
             )
 
         self._compiled_evoformer = compiled_evoformer

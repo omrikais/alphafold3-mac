@@ -942,7 +942,7 @@ class TestEvoformerParity:
         assert not np.any(np.isnan(np.array(single_out))), "NaN in Evoformer single output"
         assert not np.any(np.isnan(np.array(pair_out))), "NaN in Evoformer pair output"
 
-        # Test with return_intermediates
+        # Test with return_intermediates for
         single_out2, pair_out2, intermediates = module(
             single=single_mlx,
             pair=pair_mlx,
@@ -1871,7 +1871,7 @@ class TestPairFormerJAXParity:
 
         # Extract weights from MLX module for JAX comparison
         # This verifies that the MLX module produces consistent results
-        # For full parity, we would need to implement JAX PairFormer forward
+        # For full , we would need to implement JAX PairFormer forward
 
         # For now, verify key properties that indicate parity:
         # 1. Output shapes correct
@@ -1967,6 +1967,7 @@ class TestEndToEndParity:
 
         token_features = TokenFeatures(
             aatype=aatype,
+            token_index=mx.arange(num_residues, dtype=mx.int32),
             mask=mask,
             residue_index=residue_index,
             asym_id=asym_id,
@@ -2037,6 +2038,7 @@ class TestEndToEndParity:
 
         token_features = TokenFeatures(
             aatype=mx.zeros((num_residues,), dtype=mx.int32),
+            token_index=mx.arange(num_residues, dtype=mx.int32),
             mask=mx.ones((num_residues,), dtype=mx.float32),
             residue_index=mx.arange(num_residues, dtype=mx.int32),
             asym_id=mx.zeros((num_residues,), dtype=mx.int32),
@@ -2126,6 +2128,7 @@ class TestEndToEndParity:
 
         token_features = TokenFeatures(
             aatype=mx.array(ref_aatype[0], dtype=mx.int32),  # Use reference aatype
+            token_index=mx.arange(num_residues, dtype=mx.int32),
             mask=mx.ones((num_residues,), dtype=mx.float32),
             residue_index=mx.arange(num_residues, dtype=mx.int32),
             asym_id=mx.zeros((num_residues,), dtype=mx.int32),

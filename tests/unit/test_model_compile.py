@@ -1,4 +1,4 @@
-"""Tests for Model.compile functionality.
+"""Tests for Model.compile() functionality.
 
 Verifies that:
 - compile() can be called without errors
@@ -12,46 +12,7 @@ import pytest
 import numpy as np
 import mlx.core as mx
 
-from alphafold3_mlx.model import Model
-from alphafold3_mlx.core import ModelConfig, FeatureBatch
-from alphafold3_mlx.core.config import EvoformerConfig, DiffusionConfig, GlobalConfig
-
-
-def create_test_batch(num_residues: int = 8, seed: int = 42) -> FeatureBatch:
-    """Create minimal feature batch for testing."""
-    np.random.seed(seed)
-
-    feature_dict = {
-        "aatype": np.random.randint(0, 20, size=num_residues).astype(np.int32),
-        "token_mask": np.ones(num_residues, dtype=np.float32),
-        "residue_index": np.arange(num_residues, dtype=np.int32),
-        "asym_id": np.zeros(num_residues, dtype=np.int32),
-        "entity_id": np.zeros(num_residues, dtype=np.int32),
-        "sym_id": np.zeros(num_residues, dtype=np.int32),
-    }
-
-    return FeatureBatch.from_numpy(feature_dict)
-
-
-def create_small_model(use_compile: bool = True) -> Model:
-    """Create a small model for testing."""
-    config = ModelConfig(
-        evoformer=EvoformerConfig(
-            num_pairformer_layers=2,
-            use_msa_stack=False,
-        ),
-        diffusion=DiffusionConfig(
-            num_steps=3,
-            num_samples=1,
-            num_transformer_blocks=4,
-        ),
-        global_config=GlobalConfig(
-            precision="float32",
-            use_compile=use_compile,
-        ),
-        num_recycles=1,
-    )
-    return Model(config)
+from tests.unit.conftest import create_test_batch, create_small_model
 
 
 class TestModelCompile:
@@ -131,7 +92,7 @@ class TestModelCompile:
 
 
 class TestDiffusionHeadCompile:
-    """Test DiffusionHead.compile method."""
+    """Test DiffusionHead.compile() method."""
 
     def test_diffusion_head_compile_standalone(self):
         """Test that DiffusionHead can be compiled independently."""
@@ -185,7 +146,7 @@ class TestDiffusionHeadCompile:
 
 
 class TestConfidenceHeadCompile:
-    """Test ConfidenceHead.compile method."""
+    """Test ConfidenceHead.compile() method."""
 
     def test_confidence_head_compile_standalone(self):
         """Test that ConfidenceHead.compile() can be called without errors."""

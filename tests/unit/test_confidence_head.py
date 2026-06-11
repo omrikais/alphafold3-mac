@@ -32,48 +32,64 @@ def token_atoms_to_pseudo_beta_factory():
     return _factory
 
 
+def _make_confidence_head(num_pairformer_layers: int = 1) -> ConfidenceHead:
+    """Create a ConfidenceHead with standard test dimensions."""
+    config = ConfidenceConfig(num_pairformer_layers=num_pairformer_layers)
+    global_config = GlobalConfig(use_compile=False)
+    return ConfidenceHead(
+        config=config,
+        global_config=global_config,
+        seq_channel=384,
+        pair_channel=128,
+    )
+
+
+def _run_confidence_head(confidence_head, token_atoms_to_pseudo_beta_factory,
+                         num_residues: int = 16, num_atoms: int = 37,
+                         random_inputs: bool = False, seed: int = 42):
+    """Run confidence head forward pass with standard test inputs.
+
+    Returns:
+        (result, batch_size) tuple.
+    """
+    batch = 1
+    if random_inputs:
+        np.random.seed(seed)
+        single = mx.array(np.random.randn(num_residues, 384).astype(np.float32))
+        pair = mx.array(np.random.randn(num_residues, num_residues, 128).astype(np.float32))
+        positions = mx.array(np.random.randn(num_residues, num_atoms, 3).astype(np.float32))
+    else:
+        single = mx.zeros((num_residues, 384))
+        pair = mx.zeros((num_residues, num_residues, 128))
+        positions = mx.zeros((num_residues, num_atoms, 3))
+
+    asym_id = mx.zeros((num_residues,), dtype=mx.int32)
+    seq_mask = mx.ones((num_residues,))
+    target_feat = mx.zeros((num_residues, 22))
+    token_atoms_to_pseudo_beta = token_atoms_to_pseudo_beta_factory(num_residues, num_atoms)
+    embeddings = {"single": single, "pair": pair, "target_feat": target_feat}
+
+    result = confidence_head(
+        dense_atom_positions=positions,
+        embeddings=embeddings,
+        seq_mask=seq_mask,
+        token_atoms_to_pseudo_beta=token_atoms_to_pseudo_beta,
+        asym_id=asym_id,
+    )
+    return result, batch
+
+
 class TestConfidenceHeadBasic:
     """Test basic ConfidenceHead functionality."""
 
     @pytest.fixture
     def confidence_head(self):
-        """Create a ConfidenceHead for testing."""
-        config = ConfidenceConfig(
-            num_pairformer_layers=2,  # Small for testing
-        )
-        global_config = GlobalConfig(use_compile=False)
-        return ConfidenceHead(
-            config=config,
-            global_config=global_config,
-            seq_channel=384,
-            pair_channel=128,
-        )
+        return _make_confidence_head(num_pairformer_layers=2)
 
     def test_output_types(self, confidence_head, token_atoms_to_pseudo_beta_factory):
         """Test that confidence head returns expected output structure."""
-        batch, num_residues, num_atoms = 1, 16, 37
-        single = mx.zeros((num_residues, 384))
-        pair = mx.zeros((num_residues, num_residues, 128))
-        # Atom37 positions: [num_residues, 37, 3]
-        positions = mx.zeros((num_residues, num_atoms, 3))
-        asym_id = mx.zeros((num_residues,), dtype=mx.int32)
-        seq_mask = mx.ones((num_residues,))
-        target_feat = mx.zeros((num_residues, 22))
+        result, _ = _run_confidence_head(confidence_head, token_atoms_to_pseudo_beta_factory)
 
-        token_atoms_to_pseudo_beta = token_atoms_to_pseudo_beta_factory(
-            num_residues, num_atoms
-        )
-        embeddings = {"single": single, "pair": pair, "target_feat": target_feat}
-
-        result = confidence_head(
-            dense_atom_positions=positions,
-            embeddings=embeddings,
-            seq_mask=seq_mask,
-            token_atoms_to_pseudo_beta=token_atoms_to_pseudo_beta,
-            asym_id=asym_id,
-        )
-
-        # Check all required outputs
         assert hasattr(result, "plddt")
         assert hasattr(result, "pae")
         assert hasattr(result, "pde")
@@ -86,67 +102,23 @@ class TestPLDDT:
 
     @pytest.fixture
     def confidence_head(self):
-        """Create ConfidenceHead for testing."""
-        config = ConfidenceConfig(num_pairformer_layers=1)
-        global_config = GlobalConfig(use_compile=False)
-        return ConfidenceHead(
-            config=config,
-            global_config=global_config,
-            seq_channel=384,
-            pair_channel=128,
-        )
+        return _make_confidence_head()
 
     def test_plddt_shape(self, confidence_head, token_atoms_to_pseudo_beta_factory):
         """Test pLDDT output shape."""
-        batch, num_residues, num_atoms = 1, 32, 37
-        single = mx.zeros((num_residues, 384))
-        pair = mx.zeros((num_residues, num_residues, 128))
-        positions = mx.zeros((num_residues, num_atoms, 3))
-        asym_id = mx.zeros((num_residues,), dtype=mx.int32)
-        seq_mask = mx.ones((num_residues,))
-        target_feat = mx.zeros((num_residues, 22))
-
-        token_atoms_to_pseudo_beta = token_atoms_to_pseudo_beta_factory(
-            num_residues, num_atoms
+        num_residues, num_atoms = 32, 37
+        result, batch = _run_confidence_head(
+            confidence_head, token_atoms_to_pseudo_beta_factory,
+            num_residues=num_residues, num_atoms=num_atoms,
         )
-        embeddings = {"single": single, "pair": pair, "target_feat": target_feat}
-
-        result = confidence_head(
-            dense_atom_positions=positions,
-            embeddings=embeddings,
-            seq_mask=seq_mask,
-            token_atoms_to_pseudo_beta=token_atoms_to_pseudo_beta,
-            asym_id=asym_id,
-        )
-
-        # pLDDT is per-atom: [batch, num_residues, 37]
         assert result.plddt.shape == (batch, num_residues, num_atoms)
 
     def test_plddt_range(self, confidence_head, token_atoms_to_pseudo_beta_factory):
         """Test that pLDDT values are in valid range [0, 100]."""
-        batch, num_residues, num_atoms = 1, 16, 37
-        np.random.seed(42)
-        single = mx.array(np.random.randn(num_residues, 384).astype(np.float32))
-        pair = mx.array(np.random.randn(num_residues, num_residues, 128).astype(np.float32))
-        positions = mx.array(np.random.randn(num_residues, num_atoms, 3).astype(np.float32))
-        asym_id = mx.zeros((num_residues,), dtype=mx.int32)
-        seq_mask = mx.ones((num_residues,))
-        target_feat = mx.zeros((num_residues, 22))
-
-        token_atoms_to_pseudo_beta = token_atoms_to_pseudo_beta_factory(
-            num_residues, num_atoms
-        )
-        embeddings = {"single": single, "pair": pair, "target_feat": target_feat}
-
-        result = confidence_head(
-            dense_atom_positions=positions,
-            embeddings=embeddings,
-            seq_mask=seq_mask,
-            token_atoms_to_pseudo_beta=token_atoms_to_pseudo_beta,
-            asym_id=asym_id,
+        result, _ = _run_confidence_head(
+            confidence_head, token_atoms_to_pseudo_beta_factory, random_inputs=True,
         )
         mx.eval(result.plddt)
-
         plddt_np = np.array(result.plddt)
         assert np.all(plddt_np >= 0), "pLDDT should be >= 0"
         assert np.all(plddt_np <= 100), "pLDDT should be <= 100"
@@ -157,40 +129,15 @@ class TestPAE:
 
     @pytest.fixture
     def confidence_head(self):
-        """Create ConfidenceHead for testing."""
-        config = ConfidenceConfig(num_pairformer_layers=1)
-        global_config = GlobalConfig(use_compile=False)
-        return ConfidenceHead(
-            config=config,
-            global_config=global_config,
-            seq_channel=384,
-            pair_channel=128,
-        )
+        return _make_confidence_head()
 
     def test_pae_shape(self, confidence_head, token_atoms_to_pseudo_beta_factory):
         """Test PAE output shape is NxN matrix."""
-        batch, num_residues, num_atoms = 1, 16, 37
-        single = mx.zeros((num_residues, 384))
-        pair = mx.zeros((num_residues, num_residues, 128))
-        positions = mx.zeros((num_residues, num_atoms, 3))
-        asym_id = mx.zeros((num_residues,), dtype=mx.int32)
-        seq_mask = mx.ones((num_residues,))
-        target_feat = mx.zeros((num_residues, 22))
-
-        token_atoms_to_pseudo_beta = token_atoms_to_pseudo_beta_factory(
-            num_residues, num_atoms
+        num_residues = 16
+        result, _ = _run_confidence_head(
+            confidence_head, token_atoms_to_pseudo_beta_factory,
+            num_residues=num_residues,
         )
-        embeddings = {"single": single, "pair": pair, "target_feat": target_feat}
-
-        result = confidence_head(
-            dense_atom_positions=positions,
-            embeddings=embeddings,
-            seq_mask=seq_mask,
-            token_atoms_to_pseudo_beta=token_atoms_to_pseudo_beta,
-            asym_id=asym_id,
-        )
-
-        # PAE should be NxN matrix
         assert result.pae.shape[-2:] == (num_residues, num_residues)
 
 
@@ -199,40 +146,15 @@ class TestPDE:
 
     @pytest.fixture
     def confidence_head(self):
-        """Create ConfidenceHead for testing."""
-        config = ConfidenceConfig(num_pairformer_layers=1)
-        global_config = GlobalConfig(use_compile=False)
-        return ConfidenceHead(
-            config=config,
-            global_config=global_config,
-            seq_channel=384,
-            pair_channel=128,
-        )
+        return _make_confidence_head()
 
     def test_pde_shape(self, confidence_head, token_atoms_to_pseudo_beta_factory):
         """Test PDE output shape is NxN matrix."""
-        batch, num_residues, num_atoms = 1, 16, 37
-        single = mx.zeros((num_residues, 384))
-        pair = mx.zeros((num_residues, num_residues, 128))
-        positions = mx.zeros((num_residues, num_atoms, 3))
-        asym_id = mx.zeros((num_residues,), dtype=mx.int32)
-        seq_mask = mx.ones((num_residues,))
-        target_feat = mx.zeros((num_residues, 22))
-
-        token_atoms_to_pseudo_beta = token_atoms_to_pseudo_beta_factory(
-            num_residues, num_atoms
+        num_residues = 16
+        result, _ = _run_confidence_head(
+            confidence_head, token_atoms_to_pseudo_beta_factory,
+            num_residues=num_residues,
         )
-        embeddings = {"single": single, "pair": pair, "target_feat": target_feat}
-
-        result = confidence_head(
-            dense_atom_positions=positions,
-            embeddings=embeddings,
-            seq_mask=seq_mask,
-            token_atoms_to_pseudo_beta=token_atoms_to_pseudo_beta,
-            asym_id=asym_id,
-        )
-
-        # PDE should be NxN matrix
         assert result.pde.shape[-2:] == (num_residues, num_residues)
 
 
@@ -241,67 +163,21 @@ class TestTMScores:
 
     @pytest.fixture
     def confidence_head(self):
-        """Create ConfidenceHead for testing."""
-        config = ConfidenceConfig(num_pairformer_layers=1)
-        global_config = GlobalConfig(use_compile=False)
-        return ConfidenceHead(
-            config=config,
-            global_config=global_config,
-            seq_channel=384,
-            pair_channel=128,
-        )
+        return _make_confidence_head()
 
     def test_ptm_scalar(self, confidence_head, token_atoms_to_pseudo_beta_factory):
         """Test that pTM is a scalar value."""
-        batch, num_residues, num_atoms = 1, 16, 37
-        single = mx.zeros((num_residues, 384))
-        pair = mx.zeros((num_residues, num_residues, 128))
-        positions = mx.zeros((num_residues, num_atoms, 3))
-        asym_id = mx.zeros((num_residues,), dtype=mx.int32)
-        seq_mask = mx.ones((num_residues,))
-        target_feat = mx.zeros((num_residues, 22))
-
-        token_atoms_to_pseudo_beta = token_atoms_to_pseudo_beta_factory(
-            num_residues, num_atoms
+        result, batch = _run_confidence_head(
+            confidence_head, token_atoms_to_pseudo_beta_factory,
         )
-        embeddings = {"single": single, "pair": pair, "target_feat": target_feat}
-
-        result = confidence_head(
-            dense_atom_positions=positions,
-            embeddings=embeddings,
-            seq_mask=seq_mask,
-            token_atoms_to_pseudo_beta=token_atoms_to_pseudo_beta,
-            asym_id=asym_id,
-        )
-
-        # pTM should be scalar or (batch,) shaped
         assert result.ptm.size == 1 or result.ptm.shape == (batch,)
 
     def test_ptm_range(self, confidence_head, token_atoms_to_pseudo_beta_factory):
         """Test that pTM is in valid range [0, 1]."""
-        batch, num_residues, num_atoms = 1, 16, 37
-        np.random.seed(42)
-        single = mx.array(np.random.randn(num_residues, 384).astype(np.float32))
-        pair = mx.array(np.random.randn(num_residues, num_residues, 128).astype(np.float32))
-        positions = mx.array(np.random.randn(num_residues, num_atoms, 3).astype(np.float32))
-        asym_id = mx.zeros((num_residues,), dtype=mx.int32)
-        seq_mask = mx.ones((num_residues,))
-        target_feat = mx.zeros((num_residues, 22))
-
-        token_atoms_to_pseudo_beta = token_atoms_to_pseudo_beta_factory(
-            num_residues, num_atoms
-        )
-        embeddings = {"single": single, "pair": pair, "target_feat": target_feat}
-
-        result = confidence_head(
-            dense_atom_positions=positions,
-            embeddings=embeddings,
-            seq_mask=seq_mask,
-            token_atoms_to_pseudo_beta=token_atoms_to_pseudo_beta,
-            asym_id=asym_id,
+        result, _ = _run_confidence_head(
+            confidence_head, token_atoms_to_pseudo_beta_factory, random_inputs=True,
         )
         mx.eval(result.ptm)
-
         ptm_val = float(result.ptm.item()) if result.ptm.size == 1 else float(result.ptm[0].item())
         assert 0 <= ptm_val <= 1, "pTM should be in [0, 1]"
 
@@ -313,16 +189,13 @@ class TestConfidenceRelativeError:
 
     @pytest.fixture
     def golden_data(self):
-        """Load golden reference data if available."""
-        from pathlib import Path
-        golden_path = Path(self.GOLDEN_FILE)
-        if not golden_path.exists():
-            pytest.skip(f"Golden reference not found: {golden_path}. "
-                       "Run: python scripts/generate_model_reference_outputs.py")
-        return np.load(golden_path)
+        from tests.unit.conftest import load_golden_data
+        return load_golden_data(self.GOLDEN_FILE)
 
     def test_confidence_output_validity(self, golden_data, token_atoms_to_pseudo_beta_factory):
-        """Validate confidence outputs are in valid ranges. requirement: Confidence scores must be valid:
+        """Validate confidence outputs are in valid ranges.
+
+        requirement: Confidence scores must be valid:
         - pLDDT in [0, 100]
         - PAE in [0, 50]
         - pTM in [0, 1]
@@ -338,7 +211,7 @@ class TestConfidenceRelativeError:
         config = ConfidenceConfig(num_pairformer_layers=2)
         confidence_head = ConfidenceHead(
             config=config,
-            global_config=GlobalConfig,
+            global_config=GlobalConfig(),
             seq_channel=single_input.shape[-1],
             pair_channel=pair_input.shape[-1],
         )
@@ -374,11 +247,11 @@ class TestConfidenceRelativeError:
 
         # Verify valid ranges
         assert np.all(plddt_np >= 0) and np.all(plddt_np <= 100), \
-            f"pLDDT out of range [0, 100]: [{plddt_np.min:.2f}, {plddt_np.max:.2f}]"
+            f"pLDDT out of range [0, 100]: [{plddt_np.min():.2f}, {plddt_np.max():.2f}]"
         assert np.all(pae_np >= 0) and np.all(pae_np <= 50), \
-            f"PAE out of range [0, 50]: [{pae_np.min:.2f}, {pae_np.max:.2f}]"
+            f"PAE out of range [0, 50]: [{pae_np.min():.2f}, {pae_np.max():.2f}]"
         assert np.all(ptm_np >= 0) and np.all(ptm_np <= 1), \
-            f"pTM out of range [0, 1]: [{ptm_np.min:.2f}, {ptm_np.max:.2f}]"
+            f"pTM out of range [0, 1]: [{ptm_np.min():.2f}, {ptm_np.max():.2f}]"
 
 
 class TestConfidenceGoldenValidation:
@@ -388,13 +261,8 @@ class TestConfidenceGoldenValidation:
 
     @pytest.fixture
     def golden_data(self):
-        """Load golden reference data if available."""
-        from pathlib import Path
-        golden_path = Path(self.GOLDEN_FILE)
-        if not golden_path.exists:
-            pytest.skip(f"Golden reference not found: {golden_path}. "
-                       "Run: python scripts/generate_model_reference_outputs.py")
-        return np.load(golden_path)
+        from tests.unit.conftest import load_golden_data
+        return load_golden_data(self.GOLDEN_FILE)
 
     def test_golden_comparison(self, golden_data, token_atoms_to_pseudo_beta_factory):
         """Compare confidence head output against golden reference.
@@ -417,7 +285,7 @@ class TestConfidenceGoldenValidation:
         config = ConfidenceConfig(num_pairformer_layers=2)
         confidence_head = ConfidenceHead(
             config=config,
-            global_config=GlobalConfig,
+            global_config=GlobalConfig(),
             seq_channel=single_input.shape[-1],
             pair_channel=pair_input.shape[-1],
         )

@@ -12,6 +12,13 @@ def _one_hot(x: mx.array, num_classes: int) -> mx.array:
     return (x[..., None] == mx.arange(num_classes)).astype(mx.float32)
 
 
+def _mask_mean(mask: mx.array, value: mx.array, axis, keepdims, eps=1e-6) -> mx.array:
+    """Masked mean: sum(mask * value) / sum(mask)."""
+    numerator = mx.sum(mask * value, axis=axis, keepdims=keepdims)
+    denom = mx.sum(mask, axis=axis, keepdims=keepdims)
+    return numerator / (denom + eps)
+
+
 def create_relative_encoding(
     seq_features: TokenFeatures,
     max_relative_idx: int,

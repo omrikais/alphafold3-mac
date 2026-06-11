@@ -52,18 +52,6 @@ def karras_schedule(
     return sigma
 
 
-def get_noise_level_embedding_dim(embed_dim: int) -> int:
-    """Get the number of frequencies for noise level embedding.
-
-    Args:
-        embed_dim: Target embedding dimension.
-
-    Returns:
-        Number of Fourier frequencies (embed_dim // 2).
-    """
-    return embed_dim // 2
-
-
 class NoiseLevelEmbedding(nn.Module):
     """Fourier feature embedding for noise levels.
 

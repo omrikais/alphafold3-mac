@@ -57,9 +57,9 @@ class TestAllMasked:
 
         output_np = np.array(result.output)
 
-        # The spec explicitly requires zeros for fully masked rows
+        # explicitly requires zeros for fully masked rows
         assert np.allclose(output_np, 0.0), (
-            f"Violation: fully masked output must be zeros, "
+            f"violation: fully masked output must be zeros, "
             f"got min={output_np.min()}, max={output_np.max()}"
         )
 
