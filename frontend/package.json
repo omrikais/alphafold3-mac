@@ -19,7 +19,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",
     "molstar": "^5.6.1",
-    "next": "16.2.6",
+    "next": "16.2.11",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
