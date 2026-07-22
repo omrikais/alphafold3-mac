@@ -27,7 +27,7 @@ dependencies = [
     "numpy",
     "pyyaml>=6.0",
     "rdkit>=2024.3.5",
-    "setuptools==78.1.1",
+    "setuptools==83.0.0",
     "tokamax==0.0.8; sys_platform == 'linux'",
     "tqdm",
     "zstandard",
