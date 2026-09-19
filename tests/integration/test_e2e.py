@@ -4,7 +4,7 @@ These tests verify output file creation and
 full pipeline execution.
 
 Phase 8 (User Story 6) adds:
-- JAX parity tests
+- Synthetic JAX fixture smoke tests
 - mmCIF validity tests
 - Multi-chain output tests
 - Helper functions for structure comparison
@@ -27,6 +27,17 @@ import pytest
 CLI_SCRIPT = Path(__file__).parent.parent.parent / "run_alphafold_mlx.py"
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures" / "e2e_inputs"
 JAX_REFS_DIR = Path(__file__).parent.parent / "fixtures" / "jax_af3_refs"
+
+
+def assert_synthetic_jax_fixture_scope(
+    ref: np.lib.npyio.NpzFile,
+) -> None:
+    """Reject certification claims from the synthetic/random fixture."""
+    manifest = json.loads((JAX_REFS_DIR / "AF3_MANIFEST.json").read_text())
+    assert manifest["reference_scope"] == "synthetic_module_smoke"
+    assert manifest["representative_certification_eligible"] is False
+    assert not bool(ref["sc003_compliant"])
+    assert not bool(ref["representative_certification_eligible"])
 
 
 # =============================================================================
@@ -1138,38 +1149,32 @@ class TestVerboseTiming:
 # =============================================================================
 
 
-class TestJAXParity:
-    """Tests for JAX parity validation.
+class TestSyntheticJAXFixtureSmoke:
+    """Schema and helper smoke tests for the synthetic JAX fixture.
 
-    These tests compare MLX outputs to pre-generated JAX reference outputs.
-    tolerances:
-    - Backbone RMSD < 0.5 Angstrom
-    - pLDDT MAE < 2 units
-    - PAE MAE < 1 Angstrom
+    The fixture has 16 residues, synthetic inputs, and random parameters. These
+    checks cannot satisfy representative parity acceptance criteria.
     """
 
     @pytest.mark.skipif(
         not JAX_REFS_DIR.exists(),
         reason="JAX reference files not available"
     )
-    def test_jax_parity_50(self) -> None:
-        """Verify MLX outputs match JAX reference for 50-residue protein."""
-        # This test uses the end_to_end_ref.npz which has 16 residues in small config
-        # For actual 50-residue parity, would need a 50-residue reference file
+    def test_synthetic_fixture_self_comparison(self) -> None:
+        """Verify the comparison helper with the identical synthetic fixture."""
         ref_path = JAX_REFS_DIR / "end_to_end_ref.npz"
         if not ref_path.exists():
             pytest.skip("end_to_end_ref.npz not found")
 
         # Load reference to verify structure
         ref = np.load(ref_path, allow_pickle=True)
+        assert_synthetic_jax_fixture_scope(ref)
 
         # Verify reference has expected keys
         assert "atom_positions" in ref, "Reference missing atom_positions"
         assert "noise_levels" in ref, "Reference missing noise_levels"
 
-        # Simulate MLX output matching reference (placeholder for actual inference)
-        # In real test, this would run MLX inference and compare
-        # For now, verify reference file is valid and comparison function works
+        # Exercise the comparison helper with identical synthetic arrays.
         mlx_output = {
             "atom_positions": ref["atom_positions"],
             "plddt": ref.get("predicted_lddt", np.zeros((16, 32))),
@@ -1187,14 +1192,14 @@ class TestJAXParity:
         not JAX_REFS_DIR.exists(),
         reason="JAX reference files not available"
     )
-    def test_jax_parity_100(self) -> None:
-        """Verify MLX outputs match JAX reference for 100-residue protein."""
-        # Use the available end_to_end reference for validation
+    def test_synthetic_fixture_coordinate_schema(self) -> None:
+        """Verify coordinate shape and finite values in the synthetic fixture."""
         ref_path = JAX_REFS_DIR / "end_to_end_ref.npz"
         if not ref_path.exists():
             pytest.skip("end_to_end_ref.npz not found")
 
         ref = np.load(ref_path, allow_pickle=True)
+        assert_synthetic_jax_fixture_scope(ref)
         num_residues = int(ref.get("num_residues", 16))
 
         # Verify reference is valid
@@ -1209,13 +1214,14 @@ class TestJAXParity:
         not JAX_REFS_DIR.exists(),
         reason="JAX reference files not available"
     )
-    def test_jax_parity_200(self) -> None:
-        """Verify MLX outputs match JAX reference for 200-residue protein."""
+    def test_synthetic_fixture_diffusion_schema(self) -> None:
+        """Verify diffusion checkpoint fields in the synthetic fixture."""
         ref_path = JAX_REFS_DIR / "end_to_end_ref.npz"
         if not ref_path.exists():
             pytest.skip("end_to_end_ref.npz not found")
 
         ref = np.load(ref_path, allow_pickle=True)
+        assert_synthetic_jax_fixture_scope(ref)
 
         # Verify diffusion outputs are captured
         assert "positions_noisy_steps" in ref, "Missing diffusion intermediate outputs"
@@ -1231,13 +1237,14 @@ class TestJAXParity:
         not JAX_REFS_DIR.exists(),
         reason="JAX reference files not available"
     )
-    def test_jax_parity_500(self) -> None:
-        """Verify MLX outputs match JAX reference for 500-residue protein."""
+    def test_synthetic_fixture_confidence_schema(self) -> None:
+        """Verify confidence checkpoint fields in the synthetic fixture."""
         ref_path = JAX_REFS_DIR / "end_to_end_ref.npz"
         if not ref_path.exists():
             pytest.skip("end_to_end_ref.npz not found")
 
         ref = np.load(ref_path, allow_pickle=True)
+        assert_synthetic_jax_fixture_scope(ref)
 
         # Verify confidence outputs
         assert "tmscore_adjusted_pae_global" in ref, "Missing pTM score"
@@ -1256,15 +1263,13 @@ class TestJAXParity:
         not Path("weights/model/af3.bin.zst").exists(),
         reason="Model weights not available"
     )
-    def test_jax_parity_cli_inference(self) -> None:
-        """Test CLI inference produces outputs comparable to JAX reference.
-
-        This test runs actual MLX inference and compares to JAX reference.
-        Requires model weights to be available.
-        """
+    def test_cli_inference_smoke_with_synthetic_fixture_available(self) -> None:
+        """Verify CLI output creation while the synthetic fixture is available."""
         ref_path = JAX_REFS_DIR / "end_to_end_ref.npz"
         if not ref_path.exists():
             pytest.skip("JAX reference not available")
+        with np.load(ref_path, allow_pickle=True) as ref:
+            assert_synthetic_jax_fixture_scope(ref)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir) / "output"

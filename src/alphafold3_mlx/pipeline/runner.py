@@ -34,10 +34,6 @@ from alphafold3_mlx.pipeline.progress import ProgressReporter, TimingData
 
 logger = logging.getLogger(__name__)
 
-# MSA depth cap for MLX inference to avoid OOM in MSA column attention.
-# AF3 pipeline defaults to msa_crop_size=16384 which is too large for MLX SDPA.
-MAX_MSA_SEQS = 4096
-
 if TYPE_CHECKING:
     from alphafold3_mlx.pipeline.cli import CLIArguments
     from alphafold3_mlx.pipeline.input_handler import FoldInput
@@ -495,160 +491,11 @@ class InferenceRunner:
                     f"value or reduce the input size."
                 )
 
-            # Cap MSA depth for MLX memory limits.
-            # AF3 pipeline defaults to msa_crop_size=16384, which is too large
-            # for our current MLX memory budget on long chains.
-            msa = batch_dict.get("msa")
-            if msa is not None and msa.shape[0] > MAX_MSA_SEQS:
-                original_msa = msa.shape[0]
-                # Match AF3 behavior more closely: shuffle rows before truncation.
-                # Taking the first rows can bias towards low-diversity hits and
-                # degrade conditioning quality for real pipeline runs.
-                rng_seed = self.args.seed if self.args.seed is not None else 0
-                rng = np.random.default_rng(rng_seed)
-                keep = rng.permutation(original_msa)[:MAX_MSA_SEQS]
-
-                batch_dict["msa"] = msa[keep]
-                if "msa_mask" in batch_dict and batch_dict["msa_mask"] is not None:
-                    batch_dict["msa_mask"] = batch_dict["msa_mask"][keep]
-                if "deletion_matrix" in batch_dict and batch_dict["deletion_matrix"] is not None:
-                    batch_dict["deletion_matrix"] = batch_dict["deletion_matrix"][keep]
-                logger.warning(
-                    "Truncated MSA depth from %d to %d sequences for MLX memory limits",
-                    original_msa,
-                    MAX_MSA_SEQS,
-                )
-
-            # Heuristic placeholder disabling is only applicable to the
-            # fill_missing_fields() (sequence-only) path. When MSAs/templates
-            # come from the real data pipeline, keep them unchanged.
-            if not self.args.run_data_pipeline:
-                # AF3 fill_missing_fields() creates placeholder MSA/templates for
-                # sequence-only inputs. Treat these as "no MSA/template" so the
-                # model relies on target/profile conditioning instead of synthetic
-                # stack activations.
-                is_placeholder_msa, msa_metrics = self._detect_placeholder_msa(batch_dict)
-                if is_placeholder_msa:
-                    batch_dict["msa"] = None
-                    batch_dict["msa_mask"] = None
-                    batch_dict["deletion_matrix"] = None
-                    logger.warning(
-                        "Detected placeholder MSA (active_rows=%d, unique_rows=%d, "
-                        "mask_density=%.6f, profile_entropy=%.6f); disabling MSA stack",
-                        int(msa_metrics["active_rows"]),
-                        int(msa_metrics["unique_rows"]),
-                        msa_metrics["mask_density"],
-                        msa_metrics["profile_entropy"],
-                    )
-
-                is_placeholder_templates, template_metrics = self._detect_placeholder_templates(
-                    batch_dict
-                )
-                if is_placeholder_templates:
-                    batch_dict["template_aatype"] = None
-                    batch_dict["template_all_atom_positions"] = None
-                    batch_dict["template_all_atom_mask"] = None
-                    batch_dict["template_atom_positions"] = None
-                    batch_dict["template_atom_mask"] = None
-                    logger.warning(
-                        "Detected placeholder templates (nonzero_mask_atoms=%d); disabling template stack",
-                        int(template_metrics["nonzero_mask_atoms"]),
-                    )
             return FeatureBatch.from_numpy(batch_dict)
 
         except Exception as e:
             logger.error("Featurisation failed: %s", e)
             raise InferenceError(f"Featurisation failed: {e}")
-
-    def _detect_placeholder_msa(self, batch_dict: dict[str, Any]) -> tuple[bool, dict[str, float]]:
-        """Detect fill_missing_fields placeholder MSA tensors.
-
-        Placeholder MSAs produced by AF3 `fill_missing_fields()` are padded to
-        very large depth and typically contain only one duplicated active row.
-        """
-        import numpy as np
-
-        metrics = {
-            "active_rows": 0.0,
-            "unique_rows": 0.0,
-            "mask_density": 0.0,
-            "profile_entropy": 0.0,
-        }
-
-        msa = batch_dict.get("msa")
-        msa_mask = batch_dict.get("msa_mask")
-        deletion_matrix = batch_dict.get("deletion_matrix")
-        if msa is None or msa_mask is None:
-            return False, metrics
-
-        msa_np = np.asarray(msa)
-        msa_mask_np = np.asarray(msa_mask)
-        if msa_np.ndim != 2 or msa_mask_np.ndim != 2 or msa_np.shape != msa_mask_np.shape:
-            return False, metrics
-
-        row_activity = msa_mask_np.sum(axis=1)
-        active_mask = row_activity > 0
-        active_rows = int(active_mask.sum())
-        mask_density = float(msa_mask_np.mean())
-        depth = int(msa_np.shape[0])
-
-        if active_rows > 0:
-            active_msa = msa_np[active_mask]
-            unique_rows = int(np.unique(active_msa, axis=0).shape[0])
-
-            entropies: list[float] = []
-            for col in range(active_msa.shape[1]):
-                _, counts = np.unique(active_msa[:, col], return_counts=True)
-                probs = counts / counts.sum()
-                entropies.append(float(-(probs * np.log(probs + 1e-12)).sum()))
-            profile_entropy = float(np.mean(entropies))
-        else:
-            unique_rows = 0
-            profile_entropy = 0.0
-
-        deletion_sum = 0.0
-        if deletion_matrix is not None:
-            deletion_sum = float(np.asarray(deletion_matrix).sum())
-
-        metrics.update(
-            {
-                "active_rows": float(active_rows),
-                "unique_rows": float(unique_rows),
-                "mask_density": mask_density,
-                "profile_entropy": profile_entropy,
-            }
-        )
-
-        is_placeholder = (
-            depth >= 1024
-            and active_rows <= 2
-            and unique_rows <= 1
-            and mask_density < 1e-3
-            and deletion_sum == 0.0
-        )
-        return is_placeholder, metrics
-
-    def _detect_placeholder_templates(
-        self, batch_dict: dict[str, Any]
-    ) -> tuple[bool, dict[str, float]]:
-        """Detect fill_missing_fields placeholder template tensors."""
-        import numpy as np
-
-        metrics = {"nonzero_mask_atoms": 0.0}
-
-        template_atom_mask = batch_dict.get("template_atom_mask")
-        if template_atom_mask is None:
-            template_atom_mask = batch_dict.get("template_all_atom_mask")
-        if template_atom_mask is None:
-            return False, metrics
-
-        mask_np = np.asarray(template_atom_mask)
-        if mask_np.size == 0:
-            return True, metrics
-
-        nonzero_mask_atoms = int(mask_np.sum())
-        metrics["nonzero_mask_atoms"] = float(nonzero_mask_atoms)
-        return nonzero_mask_atoms == 0, metrics
 
     def _run_inference(self, model: Any, batch: Any) -> tuple[Any, Any]:
         """Run model inference.
@@ -886,7 +733,10 @@ class InferenceRunner:
             batch: Feature batch with token metadata for mmCIF chain labels.
             stats: InferenceStats with recycling/diffusion/confidence timing.
         """
-        from alphafold3_mlx.pipeline.output_handler import write_ranked_outputs
+        from alphafold3_mlx.pipeline.output_handler import (
+            build_structure_atom_metadata,
+            write_ranked_outputs,
+        )
         import numpy as np
 
         # Get timing data for timing.json
@@ -900,6 +750,9 @@ class InferenceRunner:
             "residue_index": np.array(batch.token_features.residue_index),
             "asym_id": np.array(batch.token_features.asym_id),
         }
+        token_metadata.update(
+            build_structure_atom_metadata(batch, self.input_json.input.chains)
+        )
         token_mask = np.array(batch.token_features.mask)
         if token_mask.ndim > 1:
             token_mask = token_mask.reshape(-1)

@@ -68,6 +68,8 @@ class Ccd(Mapping[str, Mapping[str, Sequence[str]]]):
     if user_ccd is not None:
       if not user_ccd:
         raise ValueError('User CCD cannot be an empty string.')
+      # Overrides belong to this instance, not the shared cached CCD pickle.
+      self._dict = self._dict.copy()
       user_ccd_cifs = {
           key: {k: tuple(v) for k, v in value.items()}
           for key, value in cif_dict.parse_multi_data_cif(user_ccd).items()

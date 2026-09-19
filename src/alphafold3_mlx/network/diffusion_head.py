@@ -38,24 +38,38 @@ if TYPE_CHECKING:
 
 
 def random_rotation(key: mx.array) -> Rot3Array:
-    """Generate a random rotation using Rot3Array.
+    """Generate a random rotation with the canonical AF3 construction.
 
-    Uses uniform random rotation according to Haar measure via
-    quaternion sampling for proper SO(3) distribution.
+    JAX AF3 orthonormalizes two Gaussian vectors and stores them as rows for
+    row-vector multiplication. ``Rot3Array`` applies matrices to column
+    vectors, so the same basis vectors are stored as columns here.
 
     Args:
         key: MLX random key.
 
     Returns:
-        Rot3Array representing a uniformly sampled rotation.
+        Rot3Array representing the sampled rotation.
     """
-    return Rot3Array.random_uniform(key=key, shape=())
+    vectors = mx.random.normal(shape=(2, 3), key=key)
+    e0 = vectors[0] / mx.maximum(mx.array(1e-10), mx.linalg.norm(vectors[0]))
+    v1 = vectors[1] - e0 * mx.sum(vectors[1] * e0)
+    e1 = v1 / mx.maximum(mx.array(1e-10), mx.linalg.norm(v1))
+    e2 = mx.stack(
+        [
+            e0[1] * e1[2] - e0[2] * e1[1],
+            e0[2] * e1[0] - e0[0] * e1[2],
+            e0[0] * e1[1] - e0[1] * e1[0],
+        ]
+    )
+    return Rot3Array.from_array(mx.transpose(mx.stack([e0, e1, e2], axis=0)))
 
 
 def random_augmentation(
     rng_key: mx.array,
     positions: mx.array,
     mask: mx.array,
+    *,
+    use_canonical_rotation: bool = True,
 ) -> mx.array:
     """Apply random rigid augmentation to positions using Vec3Array/Rot3Array.
 
@@ -65,6 +79,8 @@ def random_augmentation(
         rng_key: MLX random key.
         positions: Atom positions of shape [..., 3].
         mask: Atom mask of shape [...].
+        use_canonical_rotation: Use JAX AF3's Gram-Schmidt rotation. Restraint
+            guidance retains its separately calibrated quaternion stream.
 
     Returns:
         Augmented positions with same shape as input.
@@ -80,8 +96,13 @@ def random_augmentation(
     # Convert to Vec3Array for idiomatic geometry operations
     pos_vec = Vec3Array.from_array(centered_positions)
 
-    # Get random rotation using Rot3Array
-    rot = random_rotation(rotation_key)
+    # Restraint guidance is an MLX extension whose accepted stochastic path was
+    # calibrated with quaternion sampling. Ordinary AF3 inference follows JAX.
+    rot = (
+        random_rotation(rotation_key)
+        if use_canonical_rotation
+        else Rot3Array.random_uniform(key=rotation_key, shape=())
+    )
 
     # Apply rotation using Rot3Array.apply_to_point
     rotated_vec = rot.apply_to_point(pos_vec)
@@ -547,12 +568,21 @@ class DiffusionHead(nn.Module):
                 k = sample_keys[i]
                 k_split = mx.random.split(k, 3)
                 key_next = k_split[0]
+                # Preserve the product-calibrated MLX stream assignment. MLX
+                # and JAX use different PRNG implementations, so swapping these
+                # roles does not create equal native streams and regresses the
+                # restrained-interface acceptance case.
                 key_aug = k_split[1]
                 key_noise = k_split[2]
 
                 pos_i = positions[i]
                 # AF3 JAX applies random rigid augmentation each denoising step.
-                pos_i = random_augmentation(key_aug, pos_i, mask)
+                pos_i = random_augmentation(
+                    key_aug,
+                    pos_i,
+                    mask,
+                    use_canonical_rotation=guidance_fn is None,
+                )
 
                 gamma = gamma_0 * (noise_level > gamma_min)
                 t_hat = noise_level_prev[i] * (1 + gamma)

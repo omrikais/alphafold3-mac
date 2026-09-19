@@ -33,17 +33,20 @@ def main(argv: Sequence[str]) -> None:
 
   with opener(input_file, 'rb') as f:
     whole_file = f.read()
-  result = {
-      key: {k: tuple(v) for k, v in value.items()}
-      for key, value in tqdm.tqdm(
-          cif_dict.parse_multi_data_cif(whole_file).items(), disable=None
-      )
-  }
-  assert len(result) == whole_file.count(b'data_')
+  component_count = whole_file.count(b'data_')
+  result = cif_dict.parse_multi_data_cif(whole_file)
+  del whole_file
+  for key, value in tqdm.tqdm(result.items(), disable=None):
+    result[key] = {k: tuple(v) for k, v in value.items()}
+  assert len(result) == component_count
 
   print(f'Writing {output_file}', flush=True)
   with open(output_file, 'wb') as f:
-    pickle.dump(result, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # CCD entries form an acyclic dict/tuple/string tree. Disabling the pickle
+    # memo avoids several GiB of peak memory during this one-time build.
+    pickler = pickle.Pickler(f, protocol=pickle.HIGHEST_PROTOCOL)
+    pickler.fast = True
+    pickler.dump(result)
   print('Done', flush=True)
 
 if __name__ == '__main__':

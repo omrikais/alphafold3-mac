@@ -27,7 +27,7 @@ dependencies = [
     "numpy",
     "pyyaml>=6.0",
     "rdkit>=2024.3.5",
-    "setuptools==78.1.1",
+    "setuptools==83.0.0",
     "tokamax==0.0.8; sys_platform == 'linux'",
     "tqdm",
     "zstandard",
@@ -41,7 +41,7 @@ api = [
     "aiosqlite>=0.20.0",
     "pydantic>=2.5",
     "gemmi>=0.7.0",
-    "python-multipart>=0.0.27",
+    "python-multipart>=0.0.31",
 ]
 
 [project.urls]
@@ -53,6 +53,7 @@ Documentation = "https://github.com/omrikais/alphafold3-mac#documentation"
 [dependency-groups]
 dev = [
     "dm-tree>=0.1.9",
+    "httpx2>=2.0.0",
     "pytest>=9.0.3",
 ]
 docs = [
@@ -62,7 +63,7 @@ docs = [
     "mkdocs-minify-plugin>=0.8",
     "mkdocs-redirects>=1.2",
     "mkdocs-section-index>=0.3",
-    "pymdown-extensions>=10.21.3",
+    "pymdown-extensions>=11.0.1",
 ]
 
 [tool.uv]

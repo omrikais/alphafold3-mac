@@ -10,6 +10,7 @@ import pytest
 import numpy as np
 import mlx.core as mx
 
+from alphafold3_mlx.network import diffusion_head as diffusion_head_module
 from alphafold3_mlx.network.diffusion_head import DiffusionHead
 from alphafold3_mlx.network.noise_schedule import karras_schedule, NoiseLevelEmbedding
 from alphafold3_mlx.core.config import DiffusionConfig, GlobalConfig
@@ -372,6 +373,111 @@ class TestDiffusionSampling:
             rtol=1e-5,
             atol=1e-6,
         )
+
+    @pytest.mark.parametrize(
+        ("guided", "expected_canonical_rotation"),
+        [(False, True), (True, False)],
+    )
+    def test_sampler_preserves_calibrated_mlx_per_step_policy(
+        self,
+        batch_sampling,
+        monkeypatch,
+        guided,
+        expected_canonical_rotation,
+    ):
+        """Keep calibrated key roles and restraint-specific rotation policy."""
+
+        head = DiffusionHead(
+            config=DiffusionConfig(
+                num_steps=1,
+                num_samples=1,
+                num_transformer_blocks=4,
+            ),
+            global_config=GlobalConfig(use_compile=False),
+        )
+        split_calls = 0
+        normal_keys: list[tuple[int, ...]] = []
+        augmentation_keys: list[tuple[int, ...]] = []
+        canonical_rotation_modes: list[bool] = []
+
+        def fake_split(_key, count):
+            nonlocal split_calls
+            split_calls += 1
+            if split_calls == 1:
+                assert count == 2
+                return mx.array([[10, 0], [20, 0]], dtype=mx.uint32)
+            assert split_calls == 2
+            assert count == 3
+            return mx.array([[30, 0], [40, 0], [50, 0]], dtype=mx.uint32)
+
+        def fake_normal(*, shape, key):
+            normal_keys.append(tuple(np.asarray(key).tolist()))
+            return mx.zeros(shape, dtype=mx.float32)
+
+        def fake_augmentation(
+            key, positions, mask, *, use_canonical_rotation=True
+        ):
+            del mask
+            augmentation_keys.append(tuple(np.asarray(key).tolist()))
+            canonical_rotation_modes.append(use_canonical_rotation)
+            return positions
+
+        monkeypatch.setattr(diffusion_head_module.mx.random, "split", fake_split)
+        monkeypatch.setattr(diffusion_head_module.mx.random, "normal", fake_normal)
+        monkeypatch.setattr(
+            diffusion_head_module, "random_augmentation", fake_augmentation
+        )
+
+        result = head.sample(
+            denoising_step=lambda positions, noise_level: positions,
+            batch=batch_sampling,
+            key=mx.array([1, 0], dtype=mx.uint32),
+            num_steps=1,
+            gamma_0=0.8,
+            gamma_min=1.0,
+            noise_scale=1.003,
+            step_scale=1.5,
+            num_samples=1,
+            guidance_fn=(
+                (lambda positions, noise_level, step: mx.zeros_like(positions))
+                if guided
+                else None
+            ),
+        )
+        mx.eval(result["atom_positions"])
+
+        assert normal_keys == [(10, 0), (50, 0)]
+        assert augmentation_keys == [(40, 0)]
+        assert canonical_rotation_modes == [expected_canonical_rotation]
+
+
+def test_random_rotation_matches_canonical_gram_schmidt(monkeypatch) -> None:
+    """MLX uses the same two-normal Gram-Schmidt construction as JAX AF3."""
+
+    vectors = np.asarray(
+        [[1.0, 2.0, 3.0], [-2.0, 1.0, 0.5]], dtype=np.float32
+    )
+    calls: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
+
+    def fake_normal(*, shape, key):
+        calls.append((tuple(shape), tuple(np.asarray(key).tolist())))
+        return mx.array(vectors)
+
+    monkeypatch.setattr(diffusion_head_module.mx.random, "normal", fake_normal)
+    rotation = diffusion_head_module.random_rotation(
+        mx.array([7, 0], dtype=mx.uint32)
+    )
+
+    e0 = vectors[0] / max(1e-10, np.linalg.norm(vectors[0]))
+    v1 = vectors[1] - e0 * np.dot(vectors[1], e0)
+    e1 = v1 / max(1e-10, np.linalg.norm(v1))
+    e2 = np.cross(e0, e1)
+    # JAX multiplies row vectors by a matrix whose rows are e0/e1/e2;
+    # Rot3Array applies matrices to column vectors, so store its transpose.
+    expected = np.stack([e0, e1, e2]).T
+
+    assert calls == [((2, 3), (7, 0))]
+    np.testing.assert_allclose(np.asarray(rotation.to_array()), expected, atol=1e-6)
 
 
 class TestDiffusionPeriodicEval:

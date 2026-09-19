@@ -55,9 +55,9 @@ _WEIGHTS_DIR = Path("weights/model")
 _HAS_WEIGHTS = (_WEIGHTS_DIR / "af3.bin.zst").exists()
 
 # Genetic databases for MSA search — needed for fold-quality RMSD checks
-_DB_DIR = Path(os.environ.get("AF3_DB_DIR", "/Volumes/TRANSCEND/public_databases_v3"))
+_DB_DIR = Path(db_dir) if (db_dir := os.environ.get("AF3_DB_DIR")) else None
 _MSA_CACHE_DIR = Path("data/msa_cache")
-_HAS_DATABASES = (_DB_DIR / "uniref90_2022_05.fa").exists()
+_HAS_DATABASES = bool(_DB_DIR and (_DB_DIR / "uniref90_2022_05.fa").exists())
 
 # Mark for tests requiring model weights
 requires_weights = pytest.mark.skipif(
@@ -773,8 +773,7 @@ class TestK48DiUbiquitinSC001:
         if not use_msa:
             pytest.skip(
                 "RMSD requires MSA for chain folding. "
-                "Set AF3_DB_DIR or install databases at "
-                "/Volumes/TRANSCEND/public_databases_v3 to enable."
+                "Set AF3_DB_DIR to an AlphaFold 3 database directory to enable."
             )
         # Prerequisites are present: ref PDB exists AND MSA enabled.
         # RMSD computation failure should FAIL the test, not skip it.
