@@ -219,6 +219,35 @@ class TestWriteMMCIFFile:
         assert metadata["chain_ids"].tolist() == ["A", "B", "C"]
         assert metadata["is_ligand"].tolist() == [False, True, True]
 
+    def test_build_metadata_preserves_smiles_component_identity(self) -> None:
+        """SMILES ligands retain the canonical LIG_<chain> component ID."""
+        from types import SimpleNamespace
+        import numpy as np
+        from alphafold3_mlx.pipeline.output_handler import build_structure_atom_metadata
+
+        def encoded(name):
+            return [ord(char) - 32 for char in name] + [0] * (4 - len(name))
+
+        batch = SimpleNamespace(
+            token_features=SimpleNamespace(
+                asym_id=np.array([1]),
+                residue_index=np.array([1]),
+            ),
+            per_atom_features=SimpleNamespace(
+                ref_structure=SimpleNamespace(
+                    atom_name_chars=np.array([[encoded("C1")]]),
+                    element=np.array([[6]]),
+                ),
+            ),
+        )
+        chains = [SimpleNamespace(id="B", ccd_ids=None, smiles="CCO")]
+
+        metadata = build_structure_atom_metadata(batch, chains)
+
+        assert metadata["comp_ids"].tolist() == ["LIG_B"]
+        assert metadata["chain_ids"].tolist() == ["B"]
+        assert metadata["is_ligand"].tolist() == [True]
+
 
 class TestWriteConfidenceScores:
     """Tests for confidence scores JSON writing."""

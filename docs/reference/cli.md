@@ -52,7 +52,7 @@ source .venv/bin/activate && PYTHONPATH=src python3 run_alphafold_mlx.py \
   --input examples/desi1_monomer.json \
   --output_dir output/full \
   --run_data_pipeline \
-  --db_dir /Volumes/TRANSCEND/public_databases_v3
+  --db_dir /path/to/alphafold3_databases
 ```
 
 ### Restraint-guided run

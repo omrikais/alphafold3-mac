@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "source_commit": "9ab4911932b638a214df3e465a821e169683bf30",
+  "source_commit": "77cc17f7700eec989a54bb1ac129c0cdc97203f5",
   "paths": [
     "CMakeLists.txt",
     "LICENSE",
@@ -150,6 +150,7 @@
     "scripts/prod.sh",
     "scripts/run_validation_tests.sh",
     "scripts/start.sh",
+    "scripts/tokamax_stub.py",
     "scripts/validate_data_pipeline_paths.py",
     "scripts/verify_cpp_extensions.sh",
     "src/alphafold3/CONTRIBUTING.md",
@@ -505,7 +506,11 @@
     "tests/unit/test_structure_parser.py",
     "tests/unit/test_structure_routes.py",
     "tests/unit/test_validation_parity.py",
-    "tests/unit/test_weights.py"
+    "tests/unit/test_weights.py",
+    "tests/validation/__init__.py",
+    "tests/validation/test_benchmark.py",
+    "tests/validation/test_data_pipeline_external_deps.py",
+    "tests/validation/test_precision.py"
   ],
   "path_hashes": {
     "CMakeLists.txt": "68d99d481953216a966ba974afcfbf3b97a68c53cccd4c2d2a0d14c471ee0564",
@@ -539,7 +544,7 @@
     "docs/index.md": "4be7917e676855339cb742b85c8e5a9f7338928a53d36de2c5e72bb124d491d4",
     "docs/known_issues.md": "5f1e3ecd1d028866eb4134065963f080a814dc213724ef73d6edc23b9e5248fe",
     "docs/reference/api.md": "0d9103e6f011b2b2b5e50fd015ecb78ce633c790e64ebf58eaf1513e995d501c",
-    "docs/reference/cli.md": "460fae5d499c47c673c787b81c301659913775d512db8a2edbace1fb947f446b",
+    "docs/reference/cli.md": "2f6324685c36a2932402a99875b2ee98cc4798ab4d07edc665d8fa56967897e7",
     "docs/reference/model-parameters.md": "c1f15372843897f192fe2a9d421e3b1204a1e1e9d409ab2ad01cc27b80de9003",
     "docs/reference/validation-policy.md": "968eafcaf3d7b82b836055af5b3efb96d766d14bf65002f02f6f690234213454",
     "docs/user-guide/hpc-apptainer.md": "ae95b4fac1bce289355e1b21a8cc55f5eee4529a81a7bebfc8020f0304c1f78b",
@@ -656,6 +661,7 @@
     "scripts/prod.sh": "c30ce31b53050ae63c71e3c96ebe790fe0774d182c25606e512bcec29d14df16",
     "scripts/run_validation_tests.sh": "2b99fd9dae7acdc4501183c63e921316660db277d8cffab734ce0f5884a6cfec",
     "scripts/start.sh": "f72142c6b504e3cba2836de79323bee3f95c21754bbdfdd1c8b6a415c7250584",
+    "scripts/tokamax_stub.py": "4d00df4d9993b222cf6afc2679cbeab01b27f9c5a25c891f7165a18099b79d48",
     "scripts/validate_data_pipeline_paths.py": "0fbb7602e92bbcf7616d6ead04fe03722596c96437eb5e3203e209f4edd99a28",
     "scripts/verify_cpp_extensions.sh": "9608900f7e27c2d4277465a0ba2ae3235f258bc4ba7adde3d7885f59f13a40c8",
     "src/alphafold3/CONTRIBUTING.md": "8d5d172aa80d4c634e6ebc62790a50a33dce717320720bdf2231a1b6ca870b57",
@@ -883,7 +889,7 @@
     "src/alphafold3_mlx/pipeline/input_handler.py": "62258c0647bc64e761b50c0eed2fd0da4b32e70c888114a53e89202a5308e008",
     "src/alphafold3_mlx/pipeline/logging_config.py": "bd312ccea3e45c7754bc2885dda382c59889638860dc7a1f3c9c59e46c0603fc",
     "src/alphafold3_mlx/pipeline/msa_cache.py": "c45893dd228573a7ad38749ac30f662ca751329d98a93af8ffcdf6e0faf097e8",
-    "src/alphafold3_mlx/pipeline/output_handler.py": "fe021170159b0787fe15a00096a43622494f7bba68c31a8540e6824552441fe7",
+    "src/alphafold3_mlx/pipeline/output_handler.py": "077cb500cf16b711774fb78b724fa3586e8917c210016cae04c5e3c8b0f081a7",
     "src/alphafold3_mlx/pipeline/progress.py": "e802892627f20b9cd8efc7102e4bee7e0092b849619fcc4fc0e4a64f58deb8d6",
     "src/alphafold3_mlx/pipeline/ranking.py": "3fa26b3a138cb9f9d9abcfaa781ee920f0ebbd847f8ccc59c1ab94dbd7dda8b5",
     "src/alphafold3_mlx/pipeline/runner.py": "2bd8e899850bc7a9e8b8b5fbda476e6dd91cdca72039928be1208bcebd2a81af",
@@ -962,7 +968,7 @@
     "tests/integration/test_precision_modes.py": "748bacda9515e3cea7b09de8481890b764ce9d86d1549cafc093c50790d39e75",
     "tests/integration/test_ranking.py": "14bbc238a4eeb1eb848f1c12dc254ef1c0541b2bc1c9a57825c0e04601f23226",
     "tests/integration/test_recycling_stability.py": "0e555c1f9736cec72d9833b9c62e82322ff5d4d835de78ad84bed1f5bb40e002",
-    "tests/integration/test_restrained_inference.py": "314756bddc7896e94bfb5c2239c04db826a63e6d9f429398c0584167f79dc9b5",
+    "tests/integration/test_restrained_inference.py": "f3481ce23079b43c78ae6a195b2fb72d6d2feece647a4ef20e02c5aa6dd5c8b3",
     "tests/integration/test_restraint_pipeline_smoke.py": "7fe339fac9637ba9222a53ead9f9bf8093ec4770fafe57be6a1c5fcce3e16a54",
     "tests/integration/test_sampling.py": "204ff1b3fc0566ac34852068430cad799d17a548bff7d18675dee90edca58ee1",
     "tests/integration/test_structure_validity.py": "ee012d44bf287676fd27cfdfa853f7f409fef00e01b7f38bb337eed37055d161",
@@ -997,7 +1003,7 @@
     "tests/unit/test_module_parity.py": "839c942c859ffc4a17e4436ff75b354b4ccd4879047f5b6b3b372f75afa665ff",
     "tests/unit/test_msa_sampling.py": "4be4355ff872cffc8c5a2b4b18bebfc66e38ee9565bce741824a6464e2617b95",
     "tests/unit/test_network_accuracy.py": "6073a73d1a10cb97f8744482245c50b7441a7eb0eb3a7b45221deffa36981186",
-    "tests/unit/test_output_handler.py": "273ae5989ea7cae0ec1e25686f96f132f426c71bcb065db21b6fb2795fa5765c",
+    "tests/unit/test_output_handler.py": "053fb03df872953d5efb8b04c54583aa3591c08a9c43c742de07228415b58f5d",
     "tests/unit/test_pairformer.py": "9450404fefd6fa4fc0b78aee6b2c51fa06a1e7545d493a48f2850165933290ae",
     "tests/unit/test_recycling_msa_keys.py": "ca526292ff5ffd82704e76f792b11e16500697ae1de244397299e8403813c1cb",
     "tests/unit/test_restraint_early_validation.py": "a8f145aba5e9c42e96161b8cbfb419a3a01e4f58d0eaf26b7d33cccb1f6ac00b",
@@ -1011,6 +1017,10 @@
     "tests/unit/test_structure_parser.py": "e9a962be260b41d5d237f8a091b1947e777be39636218295ec90acf5107059be",
     "tests/unit/test_structure_routes.py": "197640028427fccd729a8ff614bca4ad3cc604b472949005e2b3cfd1fb68487a",
     "tests/unit/test_validation_parity.py": "308c6975fa1d314d3e32f50dfafa6fb561b08b29de3e253cdda9ae42a3a28650",
-    "tests/unit/test_weights.py": "a9ee8608971821ed9d95f374d34626ba48e01737727606918ad72eacb5a309af"
+    "tests/unit/test_weights.py": "a9ee8608971821ed9d95f374d34626ba48e01737727606918ad72eacb5a309af",
+    "tests/validation/__init__.py": "17dd40edbba0f5ba4e00fcd3e6621a17b985083616612f469f79a5498648e9c3",
+    "tests/validation/test_benchmark.py": "fccf07c5d23ffbd4a59454d16ef849e668926cbf4ed385d97662a3d41d4b4837",
+    "tests/validation/test_data_pipeline_external_deps.py": "fab66c7e5a4cd213bc2f95ec6f930d41918afdebc187a62d1efa454869b00f04",
+    "tests/validation/test_precision.py": "abc5d7aa543803f3c08c88617ac4b104aefafb481e3c7b38fa7f3771ad15da32"
   }
 }

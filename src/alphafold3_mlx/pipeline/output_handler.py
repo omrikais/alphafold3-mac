@@ -373,7 +373,12 @@ def build_structure_atom_metadata(batch: Any, chains: Any) -> dict[str, Any]:
     for chain in chains:
         ligand = hasattr(chain, "ccd_ids")
         if ligand:
-            components = list(chain.ccd_ids or ["UNL"])
+            if chain.ccd_ids:
+                components = list(chain.ccd_ids)
+            elif getattr(chain, "smiles", None):
+                components = [f"LIG_{chain.id}"]
+            else:
+                components = ["UNL"]
         else:
             components = list(chain.to_ccd_sequence())
         chain_metadata.append((str(chain.id), components, ligand))
