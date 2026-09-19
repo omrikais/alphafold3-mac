@@ -24,108 +24,20 @@ from alphafold3_mlx.network.msa_attention import (
     MSARowAttention,
     MSATransition,
 )
+from alphafold3_mlx.network.template_modules import (
+    make_backbone_rigid as _canonical_make_backbone_rigid,
+    pseudo_beta_fn as _canonical_pseudo_beta_fn,
+)
 
 if TYPE_CHECKING:
     from alphafold3_mlx.core.config import EvoformerConfig, GlobalConfig
 
 
-# ---------------------------------------------------------------------------
-# Template helper functions (JAX AF3 parity)
-# ---------------------------------------------------------------------------
-
-
-def _pseudo_beta_fn(
-    aatype: mx.array,
-    dense_atom_positions: mx.array,
-    dense_atom_mask: mx.array,
-) -> tuple[mx.array, mx.array]:
-    """Compute pseudo-beta positions and mask in MLX.
-
-    CB atom (index 3) for non-glycine, CA atom (index 1) for glycine.
-    Uses RESTYPE_PSEUDOBETA_INDEX from the original AF3 codebase.
-
-    Args:
-        aatype: [num_res] amino acid types.
-        dense_atom_positions: [num_res, num_atoms, 3] atom positions.
-        dense_atom_mask: [num_res, num_atoms] atom mask.
-
-    Returns:
-        Tuple of (pseudo_beta_positions [num_res, 3], pseudo_beta_mask [num_res]).
-    """
-    from alphafold3.model import protein_data_processing
-
-    # RESTYPE_PSEUDOBETA_INDEX: [31] -> atom index for each residue type
-    pb_index_table = mx.array(protein_data_processing.RESTYPE_PSEUDOBETA_INDEX)
-    pb_index = pb_index_table[aatype.astype(mx.int32)]  # [num_res]
-
-    # Gather positions: use advanced indexing
-    num_res = aatype.shape[0]
-    res_idx = mx.arange(num_res)
-    pseudo_beta = dense_atom_positions[res_idx, pb_index.astype(mx.int32)]  # [num_res, 3]
-    pseudo_beta_mask = dense_atom_mask[res_idx, pb_index.astype(mx.int32)]  # [num_res]
-
-    return pseudo_beta, pseudo_beta_mask.astype(mx.float32)
-
-
-
-
-def _make_backbone_rigid(
-    positions,  # Vec3Array [num_res, num_atoms]
-    mask: mx.array,  # [num_res, num_atoms]
-    group_indices: mx.array,  # [num_res, 8, 3]
-):
-    """Make backbone Rigid3Array and mask.
-
-    Args:
-        positions: Vec3Array of atom positions [num_res, num_atoms].
-        mask: [num_res, num_atoms] atom mask.
-        group_indices: [num_res, 8, 3] atom indices forming rigid groups.
-
-    Returns:
-        Tuple of (Rigid namedtuple with rotation and translation, rigid_mask [num_res]).
-    """
-    from alphafold3_mlx.geometry.vector import Vec3Array
-    from alphafold3_mlx.geometry.rotation_matrix import Rot3Array
-
-    # Backbone frame is group 0: indices [C, CA, N]
-    backbone_indices = group_indices[:, 0]  # [num_res, 3]
-
-    c_idx = backbone_indices[:, 0].astype(mx.int32)   # C
-    b_idx = backbone_indices[:, 1].astype(mx.int32)   # CA
-    a_idx = backbone_indices[:, 2].astype(mx.int32)   # N
-
-    num_res = mask.shape[0]
-    res_range = mx.arange(num_res)
-
-    # Gather masks for the 3 backbone atoms
-    mask_a = mask[res_range, a_idx]
-    mask_b = mask[res_range, b_idx]
-    mask_c = mask[res_range, c_idx]
-    rigid_mask = (mask_a * mask_b * mask_c).astype(mx.float32)
-
-    # Gather positions for the 3 backbone atoms
-    def _gather_vec3(positions_v3, indices):
-        """Gather Vec3Array elements along atom axis."""
-        x = positions_v3.x[res_range, indices]
-        y = positions_v3.y[res_range, indices]
-        z = positions_v3.z[res_range, indices]
-        return Vec3Array(x=x, y=y, z=z)
-
-    pos_a = _gather_vec3(positions, a_idx)  # N
-    pos_b = _gather_vec3(positions, b_idx)  # CA
-    pos_c = _gather_vec3(positions, c_idx)  # C
-
-    # Build frame: from_two_vectors(C-CA, N-CA) with translation at CA
-    rotation = Rot3Array.from_two_vectors(pos_c - pos_b, pos_a - pos_b)
-
-    class _Rigid:
-        """Minimal rigid body container."""
-        def __init__(self, rotation, translation):
-            self.rotation = rotation
-            self.translation = translation
-
-    rigid = _Rigid(rotation, pos_b)
-    return rigid, rigid_mask
+# Keep the historical private names for callers that imported them from the
+# Evoformer module while keeping the canonical atom-table implementation in
+# template_modules.py.
+_pseudo_beta_fn = _canonical_pseudo_beta_fn
+_make_backbone_rigid = _canonical_make_backbone_rigid
 
 
 class RelativePositionEmbedding(nn.Module):
@@ -333,7 +245,12 @@ class BroadcastProjection(nn.Module):
 
     def __init__(self, out_dim: int) -> None:
         super().__init__()
-        self.weight = mx.zeros((out_dim,))
+        # ``hm.Linear(num_input_dims=0, initializer='relu')`` in the
+        # canonical template embedder owns one learned scalar-to-channel
+        # weight per output channel.  A zero tensor would silently discard
+        # pseudo-beta masks, local-frame vectors, and backbone masks until a
+        # complete checkpoint happened to overwrite it.
+        self.weight = mx.random.normal((out_dim,)) * mx.sqrt(mx.array(2.0))
 
     def __call__(self, x: mx.array) -> mx.array:
         return x[..., None] * self.weight
@@ -711,6 +628,7 @@ class Evoformer(nn.Module):
             dgram_max_bin=c.template.dgram_max_bin,
             dgram_num_bins=c.template.dgram_num_bins,
         )
+        self.template_embedding.enabled = bool(c.template.enabled)
 
         # JAX-parity sequence/pair embedding projections from target features.
         self.left_single_proj = Linear(
@@ -816,6 +734,7 @@ class Evoformer(nn.Module):
         bond_features: mx.array | None = None,
         msa_features: mx.array | None = None,
         msa_mask: mx.array | None = None,
+        key: mx.array | None = None,
         return_intermediates: bool = False,
     ) -> tuple[mx.array, mx.array] | tuple[mx.array, mx.array, dict[str, mx.array]]:
         """Apply Evoformer.
@@ -838,6 +757,8 @@ class Evoformer(nn.Module):
             bond_features: Optional bond features. Shape: [batch, seq, seq, 1]
             msa_features: Optional MSA features. Shape: [batch, num_seqs, seq, msa_channel]
             msa_mask: Optional MSA mask. Shape: [batch, num_seqs, seq]
+            key: Per-recycle canonical Evoformer key. MSA row selection is
+                performed at the recycling boundary before compiled execution.
             return_intermediates: If True, return intermediate layer outputs for .
 
         Returns:

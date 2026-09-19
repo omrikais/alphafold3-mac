@@ -154,12 +154,42 @@ class OuterProductMeanMSA(nn.Module):
 
         Args:
             msa: MSA representation. Shape: [batch, num_msa, seq, msa_channel]
+                or unbatched [num_msa, seq, msa_channel].
             pair: Pair representation. Shape: [batch, seq, seq, pair_channel]
-            msa_mask: Optional MSA mask. Shape: [batch, num_msa, seq]
+                or unbatched [seq, seq, pair_channel].
+            msa_mask: Optional MSA mask. Shape: [batch, num_msa, seq] or
+                unbatched [num_msa, seq].
 
         Returns:
             Updated pair representation.
         """
+        # The canonical AF3 template path uses the same operation without a
+        # leading batch dimension.  Normalize the layout once, then restore it
+        # before returning so the batched Evoformer path remains unchanged.
+        unbatched = msa.ndim == 3
+        if unbatched:
+            if pair.ndim != 3:
+                raise ValueError(
+                    "unbatched MSA requires pair with shape [seq, seq, pair_channel]"
+                )
+            msa = msa[None, ...]
+            pair = pair[None, ...]
+            if msa_mask is not None:
+                if msa_mask.ndim != 2:
+                    raise ValueError(
+                        "unbatched MSA requires msa_mask with shape [num_msa, seq]"
+                    )
+                msa_mask = msa_mask[None, ...]
+        elif msa.ndim != 4 or pair.ndim != 4:
+            raise ValueError(
+                "batched MSA requires msa [batch, num_msa, seq, channels] and "
+                "pair [batch, seq, seq, channels]"
+            )
+        elif msa_mask is not None and msa_mask.ndim != 3:
+            raise ValueError(
+                "batched MSA requires msa_mask with shape [batch, num_msa, seq]"
+            )
+
         # Normalize
         x = self.norm(msa)
 
@@ -214,4 +244,5 @@ class OuterProductMeanMSA(nn.Module):
         # Normalize AFTER projection (JAX AF3 parity)
         output = output / (epsilon + norm[..., None])
 
-        return pair + output
+        output = pair + output
+        return output[0] if unbatched else output

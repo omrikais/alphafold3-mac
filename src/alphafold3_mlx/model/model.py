@@ -36,6 +36,7 @@ from alphafold3_mlx.network.evoformer import Evoformer
 from alphafold3_mlx.network.diffusion_head import DiffusionHead
 from alphafold3_mlx.network.confidence_head import ConfidenceHead
 from alphafold3_mlx.network.atom_cross_attention import AtomCrossAttEncoder
+from alphafold3_mlx.jax_rng import haiku_next_rng_keys
 from alphafold3_mlx.model.recycling import run_recycling_loop
 
 if TYPE_CHECKING:
@@ -359,6 +360,11 @@ class Model(nn.Module):
             )
             key = mx.random.key(42)
 
+        # Canonical run_alphafold obtains the trunk model key through the
+        # first Haiku next_rng_key() call. This key drives per-recycle MSA
+        # sampling and must match JAX exactly.
+        model_key = haiku_next_rng_keys(key, 1)[0]
+
         # Extract features
         token_features = batch.token_features
         seq_mask = token_features.mask
@@ -443,47 +449,16 @@ class Model(nn.Module):
         pair_mask = seq_mask[:, :, None] * seq_mask[:, None, :]  # [batch, seq, seq]
 
         # Prepare MSA features if available
-        msa_features = None
+        msa_rows = None
         msa_mask = None
+        msa_deletion_matrix = None
         if batch.has_msa and batch.msa_features is not None:
-            msa = batch.msa_features.msa  # [num_msa, seq]
-            if msa.ndim == 2:
-                msa = msa[None, :, :]  # Add batch dim: [batch, num_msa, seq]
-            num_msa = int(msa.shape[1])
-
-            # Match JAX featurization.create_msa_feat():
-            # one_hot(rows, POLYMER_TYPES_NUM_WITH_UNKNOWN_AND_GAP + 1) + has_deletion + deletion_value
-            msa_vocab = residue_names.POLYMER_TYPES_NUM_WITH_UNKNOWN_AND_GAP + 1
-            msa_clamped = mx.clip(msa, 0, msa_vocab - 1)
-            msa_one_hot = (msa_clamped[..., None] == mx.arange(msa_vocab)).astype(mx.float32)
-
-            # Get deletion_matrix if available
-            deletion_matrix = batch.msa_features.deletion_matrix
-            if deletion_matrix is not None:
-                if deletion_matrix.ndim == 2:
-                    deletion_matrix = deletion_matrix[None, :, :]  # Add batch dim
-
-                deletion_matrix = deletion_matrix.astype(mx.float32)
-                has_deletion = mx.clip(deletion_matrix, 0.0, 1.0)
-                deletion_value = mx.arctan(deletion_matrix / 3.0) * (2.0 / mx.pi)
-
-                # [batch, num_msa, seq, 34] - JAX order: one_hot, has_deletion, deletion_value
-                msa_features_raw = mx.concatenate([
-                    msa_one_hot,
-                    has_deletion[:, :, :, None],  # [batch, num_msa, seq, 1]
-                    deletion_value[:, :, :, None],  # [batch, num_msa, seq, 1]
-                ], axis=-1)
-            else:
-                # No deletion matrix - pad with zeros
-                zeros = mx.zeros((batch_size, num_msa, num_residues, 2))
-                msa_features_raw = mx.concatenate([msa_one_hot, zeros], axis=-1)
-
-            # Keep raw MSA feature width (34); Evoformer applies learned projection.
-            msa_features = msa_features_raw
-
+            # Preserve the compact raw MSA through the recycling boundary.
+            # Each recycle samples its canonical rows before one-hot expansion,
+            # avoiding a [16384, tokens, 34] intermediate.
+            msa_rows = batch.msa_features.msa
+            msa_deletion_matrix = batch.msa_features.deletion_matrix
             msa_mask = batch.msa_features.msa_mask
-            if msa_mask.ndim == 2:
-                msa_mask = msa_mask[None, :, :]
 
         # Prepare raw template data if available (JAX AF3 parity)
         # Raw template data is passed to Evoformer which computes features internally.
@@ -571,8 +546,11 @@ class Model(nn.Module):
             seq_mask=seq_mask,
             pair_mask=pair_mask,
             token_features=token_features,
-            msa_features=msa_features,
+            msa_rows=msa_rows,
             msa_mask=msa_mask,
+            msa_deletion_matrix=msa_deletion_matrix,
+            num_msa=self.config.evoformer.num_msa,
+            recycling_key=model_key,
             template_aatype=template_aatype,
             template_atom_positions=template_atom_positions,
             template_atom_mask=template_atom_mask,
@@ -614,8 +592,11 @@ class Model(nn.Module):
         # Apply sequence mask to atom mask
         atom37_mask = atom37_mask * seq_mask[:, :, None]  # [batch, residues, 37]
 
-        # Generate coordinates via diffusion (directly in atom37 format)
-        key, diffusion_key = mx.random.split(key)
+        # Generate coordinates via diffusion (directly in atom37 format).
+        # Keep the calibrated MLX diffusion stream for product stability.
+        # Switching this custom restrained sampler to the JAX random stream
+        # regresses K48 interface recovery despite identical trunk outputs.
+        _, diffusion_key = mx.random.split(key)
 
         # Build a minimal diffusion batch from FeatureBatch inputs.
         from alphafold3_mlx.atom_layout import GatherInfo
@@ -1034,11 +1015,15 @@ class Model(nn.Module):
         # Load parameters into model with shape validation
         loaded_keys, missing_keys = self.load_weights_dict(mlx_params, strict=True)
 
-        # Avoid random template influence when AF3 template weights
-        # are unavailable.
-        if (
-            "evoformer.template_embedding.output_linear.weight" not in loaded_keys
-        ):
+        # Avoid random template influence when *any* AF3 template weight is
+        # unavailable.  The template stack has learned feature projections,
+        # norms, and PairFormer parameters; checking only output_linear would
+        # leave a partially initialized stack active and inject random signal.
+        required_template_keys = self._trainable_parameter_paths(
+            self.evoformer.template_embedding.trainable_parameters(),
+            prefix="evoformer.template_embedding",
+        )
+        if not self._template_weights_complete(loaded_keys, required_template_keys):
             self.evoformer.set_template_enabled(False)
 
         # Log loading statistics
@@ -1046,6 +1031,36 @@ class Model(nn.Module):
             # In debug mode, could log missing keys
             # For now, silently ignore extra params that don't match model
             pass
+
+    @staticmethod
+    def _trainable_parameter_paths(parameters: object, prefix: str = "") -> set[str]:
+        """Flatten an MLX parameter tree into dotted paths.
+
+        ``nn.Module.trainable_parameters()`` preserves Python lists used for
+        layer stacks, so a recursive walk is needed to compare the complete
+        template parameter surface with the keys loaded from Haiku.
+        """
+        if isinstance(parameters, mx.array):
+            return {prefix}
+
+        paths: set[str] = set()
+        if isinstance(parameters, dict):
+            for name, value in parameters.items():
+                child_prefix = f"{prefix}.{name}" if prefix else str(name)
+                paths.update(Model._trainable_parameter_paths(value, child_prefix))
+        elif isinstance(parameters, (list, tuple)):
+            for index, value in enumerate(parameters):
+                child_prefix = f"{prefix}.{index}" if prefix else str(index)
+                paths.update(Model._trainable_parameter_paths(value, child_prefix))
+        return paths
+
+    @staticmethod
+    def _template_weights_complete(
+        loaded_keys: object,
+        required_keys: object,
+    ) -> bool:
+        """Return whether every trainable template parameter was loaded."""
+        return set(required_keys).issubset(set(loaded_keys))
 
     def _convert_jax_params(self, jax_params: dict) -> dict:
         """Convert JAX parameter names to MLX format.

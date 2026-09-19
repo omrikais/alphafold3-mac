@@ -10,8 +10,12 @@
 
 """Tests the AlphaFold 3 data pipeline."""
 
-import pytest
-pytest.importorskip("tokamax", reason="Requires NVIDIA GPU (Linux only)")
+# The data-pipeline tests do not execute accelerated attention, but importing
+# the original JAX model configuration still requires the Tokamax API. Use the
+# existing pure-JAX compatibility module when the GPU package is unavailable.
+from scripts.tokamax_stub import install_tokamax_stub
+
+install_tokamax_stub()
 
 import contextlib
 import datetime
@@ -208,9 +212,16 @@ class DataPipelineTest(parameterized.TestCase):
     fold_input = folding_input.Input.from_json(self._test_input_json)
     data_pipeline = pipeline.DataPipeline(self._data_pipeline_config)
     full_fold_input = data_pipeline.process(fold_input)
+    # Pin the 7BU record used for this golden. RCSB's CCD was revised in 2026
+    # (NC3 charge 0 -> -1), changing ref_charge and ligand frames_mask.
+    # Source: https://files.rcsb.org/ligands/download/7BU.cif
+    # This snapshot records _chem_comp.pdbx_modified_date = 2021-03-13.
+    ligand_ccd = pathlib.Path(
+        testing_data.Data(resources.ROOT / 'test_data/7bu_ccd_2021.cif').path()
+    ).read_text(encoding='utf-8')
     featurised_example = featurisation.featurise_input(
         full_fold_input,
-        ccd=chemical_components.Ccd(),
+        ccd=chemical_components.Ccd(user_ccd=ligand_ccd),
         buckets=None,
     )
     del featurised_example[0]['ref_pos']  # Depends on specific RDKit version.

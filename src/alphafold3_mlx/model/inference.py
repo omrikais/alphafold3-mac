@@ -262,6 +262,11 @@ def _generate_mmcif(
     residue_index: "np.ndarray",
     asym_id: "np.ndarray",
     atom_mask: "np.ndarray | None" = None,
+    atom_names: "np.ndarray | None" = None,
+    element_symbols: "np.ndarray | None" = None,
+    comp_ids: "np.ndarray | None" = None,
+    chain_ids: "np.ndarray | None" = None,
+    is_ligand: "np.ndarray | None" = None,
 ) -> str:
     """Generate mmCIF file content with full atom37 and PAE data.
 
@@ -339,9 +344,26 @@ def _generate_mmcif(
         return atom_name[0].upper() if atom_name else "X"
 
     num_residues = len(aatype)
+    use_dense_metadata = all(
+        value is not None for value in (atom_names, element_symbols, comp_ids)
+    )
+    if use_dense_metadata:
+        expected_atoms = coords.shape[:2]
+        if atom_names.shape != expected_atoms or element_symbols.shape != expected_atoms:
+            raise ValueError("Dense atom metadata must match coordinate layout")
+        if comp_ids.shape != (num_residues,):
+            raise ValueError("Component IDs must match token count")
+        if atom_mask is not None and atom_mask.shape != expected_atoms:
+            raise ValueError("Atom mask must match dense coordinate layout")
+        if atom_mask is None:
+            atom_mask = (atom_names != "").astype(np.float32)
+    if chain_ids is not None and chain_ids.shape != (num_residues,):
+        raise ValueError("Chain IDs must match token count")
+    if is_ligand is not None and is_ligand.shape != (num_residues,):
+        raise ValueError("Ligand flags must match token count")
 
     # Convert non-atom37 layouts (e.g. dense-24) to atom37 for mmCIF output.
-    if (
+    if not use_dense_metadata and (
         coords.shape[1] != NUM_ATOMS
         or plddt.shape[1] != NUM_ATOMS
         or (atom_mask is not None and atom_mask.shape[1] != NUM_ATOMS)
@@ -448,30 +470,45 @@ def _generate_mmcif(
     lines.append("_atom_site.B_iso_or_equiv")
     lines.append("_atom_site.occupancy")
 
+    chain_labels = [
+        str(chain_ids[index]) if chain_ids is not None
+        else chr(ord("A") + (int(asym_id[index]) - 1) % 26)
+        for index in range(num_residues)
+    ]
+    seq_labels = [
+        "." if is_ligand is not None and is_ligand[index]
+        else str(int(residue_index[index]))
+        for index in range(num_residues)
+    ]
+
     atom_id = 1
     for res_idx in range(num_residues):
         aa_type = int(aatype[res_idx])
         if aa_type >= len(AA_CODES):
             aa_type = len(AA_CODES) - 1  # UNK
-        comp_id = AA_CODES[aa_type]
+        comp_id = str(comp_ids[res_idx]) if use_dense_metadata else AA_CODES[aa_type]
 
-        chain_id = chr(ord("A") + (int(asym_id[res_idx]) - 1) % 26)
-        seq_id = int(residue_index[res_idx])
+        chain_id = chain_labels[res_idx]
+        seq_id = seq_labels[res_idx]
 
         # Write all valid atoms for this residue
-        for atom_idx in range(NUM_ATOMS):
+        for atom_idx in range(coords.shape[1] if use_dense_metadata else NUM_ATOMS):
             # Skip atoms that don't exist for this residue type
             if atom_mask[res_idx, atom_idx] < 0.5:
                 continue
 
             x, y, z = coords[res_idx, atom_idx]
             b_factor = plddt[res_idx, atom_idx]
-            atom_name = ATOM37_NAMES[atom_idx]
-            element = get_element(atom_name)
+            atom_name = str(atom_names[res_idx, atom_idx]) if use_dense_metadata else ATOM37_NAMES[atom_idx]
+            element = (
+                str(element_symbols[res_idx, atom_idx])
+                if use_dense_metadata else get_element(atom_name)
+            )
+            record_type = "HETATM" if is_ligand is not None and is_ligand[res_idx] else "ATOM"
 
             lines.append(
-                f"ATOM   {atom_id:5d} {element:2s} {atom_name:4s} {comp_id:3s} "
-                f"{chain_id:1s} {seq_id:4d}    "
+                f"{record_type:6s} {atom_id:5d} {element:2s} {atom_name:4s} {comp_id:3s} "
+                f"{chain_id:1s} {seq_id:>4s}    "
                 f"{x:8.3f} {y:8.3f} {z:8.3f} {b_factor:6.2f} 1.00"
             )
             atom_id += 1
@@ -492,11 +529,11 @@ def _generate_mmcif(
 
     pae_id = 1
     for i in range(num_residues):
-        chain_i = chr(ord("A") + (int(asym_id[i]) - 1) % 26)
-        seq_i = int(residue_index[i])
+        chain_i = chain_labels[i]
+        seq_i = seq_labels[i]
         for j in range(num_residues):
-            chain_j = chr(ord("A") + (int(asym_id[j]) - 1) % 26)
-            seq_j = int(residue_index[j])
+            chain_j = chain_labels[j]
+            seq_j = seq_labels[j]
             pae_value = pae[i, j]
             lines.append(
                 f"{pae_id} 1 {chain_i} {seq_i} {chain_j} {seq_j} {pae_value:.2f} PAE"

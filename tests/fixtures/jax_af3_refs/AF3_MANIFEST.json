@@ -1,6 +1,6 @@
 {
   "version": "5.0.0",
-  "description": "JAX AF3 reference outputs for validation",
+  "description": "Synthetic smoke outputs from actual JAX AF3 module code",
   "generated_at": "2026-02-04T08:37:55.197951",
   "platform": "Darwin",
   "python_version": "3.12.12 (main, Oct  9 2025, 11:07:00) [Clang 17.0.0 (clang-1700.6.3.2)]",
@@ -48,31 +48,41 @@
       "uses_actual_af3_module": true,
       "includes_params": true,
       "generated": true,
-      "note": "Uses ACTUAL AF3 PairFormerIteration via hk.transform"
+      "note": "Uses ACTUAL AF3 PairFormerIteration via hk.transform",
+      "reference_scope": "synthetic_module_smoke",
+      "representative_certification_eligible": false
     },
     "evoformer_ref.npz": {
       "uses_actual_af3_module": true,
       "includes_params": true,
       "generated": true,
-      "note": "Uses ACTUAL AF3 Evoformer via hk.transform"
+      "note": "Uses ACTUAL AF3 Evoformer via hk.transform",
+      "reference_scope": "synthetic_module_smoke",
+      "representative_certification_eligible": false
     },
     "diffusion_step_ref.npz": {
       "uses_actual_af3_module": true,
       "includes_params": true,
       "generated": true,
-      "note": "Uses ACTUAL AF3 DiffusionHead via hk.transform"
+      "note": "Uses ACTUAL AF3 DiffusionHead via hk.transform",
+      "reference_scope": "synthetic_module_smoke",
+      "representative_certification_eligible": false
     },
     "confidence_ref.npz": {
       "uses_actual_af3_module": true,
       "includes_params": true,
       "generated": true,
-      "note": "Uses ACTUAL AF3 ConfidenceHead via hk.transform"
+      "note": "Uses ACTUAL AF3 ConfidenceHead via hk.transform",
+      "reference_scope": "synthetic_module_smoke",
+      "representative_certification_eligible": false
     },
     "end_to_end_ref.npz": {
       "uses_actual_af3_module": true,
       "includes_params": true,
       "generated": true,
-      "note": "Uses ACTUAL AF3 Model via hk.transform"
+      "note": "Uses ACTUAL AF3 Model via hk.transform",
+      "reference_scope": "synthetic_module_smoke",
+      "representative_certification_eligible": false
     }
   },
   "compliance": {
@@ -83,19 +93,34 @@
     "end_to_end_uses_real_af3": true,
     "uses_haiku_transform": true,
     "all_files_include_params": true,
-    "sc002_pairformer_validated": true,
-    "sc002_evoformer_validated": true,
-    "sc002_diffusion_validated": true,
-    "sc002_confidence_validated": true,
-    "sc003_end_to_end_validated": true
+    "sc002_pairformer_validated": false,
+    "sc002_evoformer_validated": false,
+    "sc002_diffusion_validated": false,
+    "sc002_confidence_validated": false,
+    "sc003_end_to_end_validated": false
   },
   "notes": [
-    "PairFormer: Use ACTUAL AF3 PairFormerIteration from modules.py",
-    "Evoformer: Uses ACTUAL AF3 Evoformer from evoformer.py",
-    "Diffusion/Confidence/E2E: Use ACTUAL AF3 modules via hk.transform",
-    "Batch inputs constructed via feat_batch.Batch with nested dataclasses",
-    "tokamax stub provides pure JAX implementations when GPU unavailable",
-    "All params saved with params/... keys for MLX weight loading",
-    "References are real AF3 outputs for parity validation"
-  ]
+    "PairFormer uses the actual AF3 PairFormerIteration via hk.transform",
+    "Evoformer uses the actual AF3 Evoformer via hk.transform",
+    "Diffusion, confidence, and end-to-end smoke paths use actual AF3 modules",
+    "Batch inputs are synthetic and parameters are randomly initialized",
+    "tokamax stub provides pure JAX implementations when GPU kernels are unavailable",
+    "These artifacts are not eligible for representative or end-to-end certification"
+  ],
+  "reference_scope": "synthetic_module_smoke",
+  "representative_certification_eligible": false,
+  "provenance": {
+    "uses_actual_af3_modules": true,
+    "uses_official_weights": false,
+    "uses_representative_inputs": false,
+    "uses_synthetic_inputs": true,
+    "uses_randomly_initialized_parameters": true
+  },
+  "module_smoke_results": {
+    "pairformer": true,
+    "evoformer": true,
+    "diffusion_step": true,
+    "confidence": true,
+    "end_to_end": true
+  }
 }

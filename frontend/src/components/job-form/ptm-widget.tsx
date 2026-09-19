@@ -18,12 +18,7 @@ export function PTMWidget({
   modifications,
   onModificationsChange,
 }: PTMWidgetProps) {
-  const [expanded, setExpanded] = useState(false);
-
-  // Auto-expand when modifications exist
-  useEffect(() => {
-    if (modifications.length > 0) setExpanded(true);
-  }, [modifications.length]);
+  const [expanded, setExpanded] = useState(() => modifications.length > 0);
 
   // Prune stale modifications when sequence shortens
   useEffect(() => {

@@ -310,6 +310,16 @@ def write_mmcif_file(
                     residue_index=np.asarray(residue_index),
                     asym_id=np.asarray(asym_id),
                     atom_mask=np.asarray(atom_mask) if atom_mask is not None else None,
+                    atom_names=np.asarray(structure_data["atom_names"])
+                    if "atom_names" in structure_data else None,
+                    element_symbols=np.asarray(structure_data["element_symbols"])
+                    if "element_symbols" in structure_data else None,
+                    comp_ids=np.asarray(structure_data["comp_ids"])
+                    if "comp_ids" in structure_data else None,
+                    chain_ids=np.asarray(structure_data["chain_ids"])
+                    if "chain_ids" in structure_data else None,
+                    is_ligand=np.asarray(structure_data["is_ligand"])
+                    if "is_ligand" in structure_data else None,
                 )
             else:
                 # Fallback if coords not provided
@@ -320,6 +330,80 @@ def write_mmcif_file(
 
         with open(temp_path, "w") as f:
             f.write(mmcif_content)
+
+
+def build_structure_atom_metadata(batch: Any, chains: Any) -> dict[str, Any]:
+    """Recover the CCD atom layout and component IDs used by featurization.
+
+    Predicted dense atom slots follow the same CCD layout as the reference atom
+    features. Protein atom37 names cannot describe atomized ligands or ions.
+    """
+    import numpy as np
+    from alphafold3.constants import periodic_table
+
+    if batch.per_atom_features is None:
+        return {}
+
+    ref = batch.per_atom_features.ref_structure
+    chars = np.asarray(ref.atom_name_chars)
+    elements = np.asarray(ref.element)
+    if chars.ndim != 3 or chars.shape[-1] != 4 or chars.shape[:2] != elements.shape:
+        raise ValueError("Reference atom metadata has inconsistent dense layout")
+
+    atom_names = np.empty(elements.shape, dtype="<U4")
+    element_symbols = np.empty(elements.shape, dtype="<U2")
+    for token_index in range(elements.shape[0]):
+        for atom_index in range(elements.shape[1]):
+            atom_names[token_index, atom_index] = "".join(
+                chr(int(value) + 32) for value in chars[token_index, atom_index]
+                if value > 0
+            )
+            atomic_number = int(elements[token_index, atom_index])
+            element_symbols[token_index, atom_index] = (
+                periodic_table.PERIODIC_TABLE[atomic_number].symbol.upper()
+                if 0 < atomic_number < len(periodic_table.PERIODIC_TABLE) else ""
+            )
+
+    asym_ids = np.asarray(batch.token_features.asym_id)
+    residue_indices = np.asarray(batch.token_features.residue_index)
+    if asym_ids.shape != (elements.shape[0],) or residue_indices.shape != asym_ids.shape:
+        raise ValueError("Token and reference atom layouts differ")
+
+    chain_metadata = []
+    for chain in chains:
+        ligand = hasattr(chain, "ccd_ids")
+        if ligand:
+            components = list(chain.ccd_ids or ["UNL"])
+        else:
+            components = list(chain.to_ccd_sequence())
+        chain_metadata.append((str(chain.id), components, ligand))
+
+    comp_ids = []
+    chain_ids = []
+    is_ligand = []
+    for asym_id, residue_index in zip(asym_ids, residue_indices):
+        chain_index = int(asym_id) - 1
+        if chain_index < 0 or chain_index >= len(chain_metadata):
+            # Padding is removed by token_mask before writing structures.
+            chain_ids.append("A")
+            comp_ids.append("UNK")
+            is_ligand.append(False)
+            continue
+        chain_id, components, ligand = chain_metadata[chain_index]
+        component_index = int(residue_index) - 1
+        if component_index < 0 or component_index >= len(components):
+            raise ValueError("Residue index is outside its source chain")
+        chain_ids.append(chain_id)
+        comp_ids.append(components[component_index])
+        is_ligand.append(ligand)
+
+    return {
+        "atom_names": atom_names,
+        "element_symbols": element_symbols,
+        "comp_ids": np.asarray(comp_ids),
+        "chain_ids": np.asarray(chain_ids),
+        "is_ligand": np.asarray(is_ligand, dtype=bool),
+    }
 
 
 def _generate_minimal_mmcif(structure_data: dict[str, Any], rank: int) -> str:
@@ -498,9 +582,8 @@ def write_ranked_outputs(
             metadata_len = len(token_metadata.get("aatype", []))
             if metadata_len == expected_len:
                 masked_token_metadata = {
-                    "aatype": np.array(token_metadata["aatype"])[mask],
-                    "residue_index": np.array(token_metadata["residue_index"])[mask],
-                    "asym_id": np.array(token_metadata["asym_id"])[mask],
+                    key: np.asarray(value)[mask]
+                    for key, value in token_metadata.items()
                 }
         if masked_token_metadata is None:
             expected_len = mask.shape[0]
@@ -540,9 +623,7 @@ def write_ranked_outputs(
         # Use token_metadata from batch (preferred - preserves chain order deterministically)
         # Fall back to np_result fields if token_metadata not provided
         if masked_token_metadata is not None:
-            structure_data["aatype"] = masked_token_metadata["aatype"]
-            structure_data["residue_index"] = masked_token_metadata["residue_index"]
-            structure_data["asym_id"] = masked_token_metadata["asym_id"]
+            structure_data.update(masked_token_metadata)
         else:
             # Fallback: check np_result (legacy path)
             if "aatype" in np_result:

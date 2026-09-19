@@ -16,6 +16,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable
 
 import mlx.core as mx
+import numpy as np
+
+from alphafold3_mlx.model.msa_sampling import (
+    create_msa_features,
+    sample_msa_for_evoformer,
+    split_key,
+)
 
 if TYPE_CHECKING:
     from alphafold3_mlx.core.entities import Embeddings
@@ -88,6 +95,7 @@ def run_recycling_loop(
     track_convergence: bool = False,
     return_intermediates: bool = False,
     iteration_callback: "Callable[[int, int], None] | None" = None,
+    recycling_key: mx.array | np.ndarray | None = None,
     **evoformer_kwargs,
 ) -> tuple[mx.array, mx.array, RecyclingState | None] | tuple[mx.array, mx.array, RecyclingState | None, dict[str, mx.array]]:
     """Run recycling loop.
@@ -110,6 +118,8 @@ def run_recycling_loop(
             the final Evoformer iteration.
         iteration_callback: Optional callback called after each iteration with
             (iteration, total_iterations) for progress reporting.
+        recycling_key: Canonical JAX-format key used to advance per-recycle MSA
+            sampling. It does not replace or advance the diffusion key.
         **evoformer_kwargs: Additional arguments for evoformer_fn.
 
     Returns:
@@ -129,6 +139,18 @@ def run_recycling_loop(
     # num_recycles is the number of additional forward passes where output is recycled.
     # Total iterations = 1 (initial) + num_recycles (recycled), matching JAX AF3 semantics.
     total_iterations = num_recycles + 1
+    model_key = (
+        None
+        if recycling_key is None
+        else np.asarray(recycling_key, dtype=np.uint32)
+    )
+
+    # Keep the full raw MSA compact between recycles. Only the selected rows
+    # are expanded to 34 channels inside each iteration.
+    raw_msa_rows = evoformer_kwargs.pop("msa_rows", None)
+    raw_msa_mask = evoformer_kwargs.get("msa_mask")
+    raw_deletion_matrix = evoformer_kwargs.pop("msa_deletion_matrix", None)
+    num_msa = evoformer_kwargs.pop("num_msa", None)
 
     # Recycling loop using Python for (per research.md Section 3)
     for i in range(total_iterations):
@@ -141,6 +163,27 @@ def run_recycling_loop(
         is_final_iteration = (i == total_iterations - 1)
         request_intermediates = return_intermediates and is_final_iteration
 
+        iteration_kwargs = dict(evoformer_kwargs)
+        if model_key is not None:
+            model_key, evoformer_key = split_key(model_key)
+            iteration_kwargs["key"] = mx.array(evoformer_key)
+            if raw_msa_rows is not None and raw_msa_mask is not None:
+                if num_msa is None:
+                    raise ValueError("num_msa is required when sampling raw MSA rows")
+                indices = sample_msa_for_evoformer(
+                    evoformer_key,
+                    np.asarray(raw_msa_mask),
+                    int(num_msa),
+                )
+                msa_features, sampled_mask = create_msa_features(
+                    raw_msa_rows,
+                    raw_msa_mask,
+                    raw_deletion_matrix,
+                    indices,
+                )
+                iteration_kwargs["msa_features"] = msa_features
+                iteration_kwargs["msa_mask"] = sampled_mask
+
         # Run Evoformer
         result = evoformer_fn(
             single=single,
@@ -150,7 +193,7 @@ def run_recycling_loop(
             seq_mask=seq_mask,
             pair_mask=pair_mask,
             return_intermediates=request_intermediates,
-            **evoformer_kwargs,
+            **iteration_kwargs,
         )
 
         # Handle return value based on whether intermediates were requested

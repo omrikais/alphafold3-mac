@@ -114,6 +114,111 @@ class TestWriteMMCIFFile:
             content = output_path.read_text()
             assert "data_" in content
 
+    def test_dense_atom_metadata_preserves_calcium_identity(self, tmp_path) -> None:
+        """An ion must not become an UNK nitrogen atom in the mmCIF output."""
+        import numpy as np
+        from alphafold3_mlx.pipeline.output_handler import write_mmcif_file
+
+        path = tmp_path / "structure_rank_1.cif"
+        write_mmcif_file(
+            {
+                "coords": np.zeros((2, 2, 3), dtype=np.float32),
+                "atom_mask": np.array([[1, 1], [1, 0]], dtype=np.float32),
+                "plddt": np.full((2, 2), 90.0, dtype=np.float32),
+                "pae": np.ones((2, 2), dtype=np.float32),
+                "ptm": 0.8,
+                "iptm": 0.8,
+                "aatype": np.array([0, 20]),
+                "residue_index": np.array([1, 1]),
+                "asym_id": np.array([1, 2]),
+                "atom_names": np.array([["N", "CA"], ["CA", ""]]),
+                "element_symbols": np.array([["N", "C"], ["CA", ""]]),
+                "comp_ids": np.array(["ALA", "CA"]),
+                "chain_ids": np.array(["A", "B"]),
+                "is_ligand": np.array([False, True]),
+            },
+            path,
+            rank=1,
+        )
+
+        atom_lines = [line.split() for line in path.read_text().splitlines()
+                      if line.startswith(("ATOM", "HETATM"))]
+        assert len(atom_lines) == 3
+        assert atom_lines[0][0:6] == ["ATOM", "1", "N", "N", "ALA", "A"]
+        assert atom_lines[1][0:6] == ["ATOM", "2", "C", "CA", "ALA", "A"]
+        assert atom_lines[2][0:6] == ["HETATM", "3", "CA", "CA", "CA", "B"]
+        assert atom_lines[2][6] == "."
+
+    def test_dense_pae_references_written_chain_and_sequence_labels(self, tmp_path) -> None:
+        import numpy as np
+        from alphafold3_mlx.pipeline.output_handler import write_mmcif_file
+
+        path = tmp_path / "structure_rank_1.cif"
+        write_mmcif_file(
+            {
+                "coords": np.zeros((2, 1, 3), dtype=np.float32),
+                "atom_mask": np.ones((2, 1), dtype=np.float32),
+                "plddt": np.full((2, 1), 90.0, dtype=np.float32),
+                "pae": np.ones((2, 2), dtype=np.float32),
+                "ptm": 0.8,
+                "iptm": 0.8,
+                "aatype": np.array([0, 20]),
+                "residue_index": np.array([1, 1]),
+                "asym_id": np.array([1, 2]),
+                "atom_names": np.array([["N"], ["CA"]]),
+                "element_symbols": np.array([["N"], ["CA"]]),
+                "comp_ids": np.array(["ALA", "CA"]),
+                "chain_ids": np.array(["X", "Y"]),
+                "is_ligand": np.array([False, True]),
+            },
+            path,
+            rank=1,
+        )
+
+        rows = path.read_text().splitlines()
+        assert any(row.startswith("ATOM") and " ALA X " in row for row in rows)
+        assert any(row.startswith("HETATM") and " CA  Y " in row for row in rows)
+        assert "2 1 X 1 Y . 1.00 PAE" in rows
+
+    def test_build_metadata_uses_featurized_atom_identity(self) -> None:
+        """The batch CCD layout supplies names for both ions and atomized ligands."""
+        from types import SimpleNamespace
+        import numpy as np
+        from alphafold3_mlx.pipeline.output_handler import build_structure_atom_metadata
+
+        def encoded(name):
+            return [ord(char) - 32 for char in name] + [0] * (4 - len(name))
+
+        batch = SimpleNamespace(
+            token_features=SimpleNamespace(
+                asym_id=np.array([1, 2, 3]),
+                residue_index=np.array([1, 1, 1]),
+            ),
+            per_atom_features=SimpleNamespace(
+                ref_structure=SimpleNamespace(
+                    atom_name_chars=np.array([
+                        [encoded("N"), encoded("CA")],
+                        [encoded("CA"), encoded("")],
+                        [encoded("FE"), encoded("")],
+                    ]),
+                    element=np.array([[7, 6], [20, 0], [26, 0]]),
+                ),
+            ),
+        )
+        chains = [
+            SimpleNamespace(id="A", to_ccd_sequence=lambda: ["ALA"]),
+            SimpleNamespace(id="B", ccd_ids=("CA",)),
+            SimpleNamespace(id="C", ccd_ids=("HEM",)),
+        ]
+
+        metadata = build_structure_atom_metadata(batch, chains)
+
+        assert metadata["atom_names"].tolist() == [["N", "CA"], ["CA", ""], ["FE", ""]]
+        assert metadata["element_symbols"].tolist() == [["N", "C"], ["CA", ""], ["FE", ""]]
+        assert metadata["comp_ids"].tolist() == ["ALA", "CA", "HEM"]
+        assert metadata["chain_ids"].tolist() == ["A", "B", "C"]
+        assert metadata["is_ligand"].tolist() == [False, True, True]
+
 
 class TestWriteConfidenceScores:
     """Tests for confidence scores JSON writing."""
@@ -531,6 +636,50 @@ class TestWriteRankedOutputs:
             # Verify mmCIF is valid
             content = (output_dir / "structure_rank_1.cif").read_text()
             assert "data_" in content, "Missing mmCIF data block"
+
+    def test_ranked_output_keeps_dense_metadata_after_padding_mask(self, tmp_path) -> None:
+        import numpy as np
+        from alphafold3_mlx.pipeline.output_handler import OutputBundle, write_ranked_outputs
+        from alphafold3_mlx.pipeline.ranking import rank_samples
+
+        class Result:
+            num_samples = 1
+
+            def to_numpy(self):
+                return {
+                    "atom_positions": np.zeros((1, 3, 2, 3), dtype=np.float32),
+                    "atom_mask": np.array([[[1, 1], [1, 0], [0, 0]]]),
+                    "plddt": np.full((1, 3, 2), 90.0),
+                    "pae": np.ones((1, 3, 3)),
+                    "ptm": np.array([0.8]),
+                    "iptm": np.array([0.8]),
+                }
+
+        ranking = rank_samples(
+            ptm_scores=[0.8], iptm_scores=[0.8],
+            plddt_scores=[[90.0]], is_complex=True,
+        )
+        bundle = OutputBundle(output_dir=tmp_path)
+        bundle.initialize_structure_files(num_samples=1)
+        write_ranked_outputs(
+            Result(), bundle, ranking,
+            token_mask=np.array([1, 1, 0]),
+            token_metadata={
+                "aatype": np.array([0, 20, 0]),
+                "residue_index": np.array([1, 1, 0]),
+                "asym_id": np.array([1, 2, 0]),
+                "atom_names": np.array([["N", "CA"], ["CA", ""], ["", ""]]),
+                "element_symbols": np.array([["N", "C"], ["CA", ""], ["", ""]]),
+                "comp_ids": np.array(["ALA", "CA", "UNK"]),
+                "chain_ids": np.array(["A", "B", "A"]),
+                "is_ligand": np.array([False, True, False]),
+            },
+        )
+
+        records = [line.split() for line in bundle.structure_path(1).read_text().splitlines()
+                   if line.startswith(("ATOM", "HETATM"))]
+        assert len(records) == 3
+        assert records[-1][0:6] == ["HETATM", "3", "CA", "CA", "CA", "B"]
 
     def test_write_ranked_outputs_orders_by_ranking(self) -> None:
         """Verify structures are written in ranked order."""

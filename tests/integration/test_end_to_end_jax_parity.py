@@ -1,9 +1,11 @@
-"""End-to-end JAX AF3 parity test.
+"""Synthetic end-to-end smoke comparison against JAX AF3 module output.
 
-Validates MLX end-to-end outputs against real JAX AF3 reference outputs.
+The fixture uses synthetic inputs and random parameters. It exercises numerical
+wiring but cannot satisfy the representative acceptance gate.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -28,8 +30,17 @@ from alphafold3_mlx.model import Model
 
 
 REF_PATH = Path("tests/fixtures/jax_af3_refs/end_to_end_ref.npz")
+MANIFEST_PATH = REF_PATH.with_name("AF3_MANIFEST.json")
 RMSD_TOL = 0.5  # Angstrom
 CONF_REL_TOL = 0.01  # 1% relative error
+
+
+def _assert_synthetic_fixture_scope(ref_data: np.lib.npyio.NpzFile) -> None:
+    manifest = json.loads(MANIFEST_PATH.read_text())
+    assert manifest["reference_scope"] == "synthetic_module_smoke"
+    assert manifest["representative_certification_eligible"] is False
+    assert not bool(ref_data["sc003_compliant"])
+    assert not bool(ref_data["representative_certification_eligible"])
 
 
 def _expand_colon_keys(ref_data: np.lib.npyio.NpzFile) -> dict[str, np.ndarray]:
@@ -322,7 +333,13 @@ def _assign_param(obj, param_name: str, value: mx.array) -> None:
 
 def _load_transformer(transformer, ref_data: np.lib.npyio.NpzFile, prefix: str, name_prefix: str) -> None:
     _load_layer_norm(transformer.pair_input_layer_norm, ref_data, f"{prefix}/pair_input_layer_norm")
-    _load_linear(transformer.pair_logits_projection, ref_data, f"{prefix}/pair_logits_projection")
+    projection_key = f"{prefix}/__layer_stack_with_per_layer/pair_logits_projection/weights"
+    assert projection_key in ref_data.keys(), f"Missing JAX projection: {projection_key}"
+    stacked_projections = ref_data[projection_key]
+    assert stacked_projections.shape[0] == len(transformer.pair_logits_projections)
+    for index, projection in enumerate(transformer.pair_logits_projections):
+        assert stacked_projections[index].shape == projection.weight.shape
+        projection.weight = mx.array(stacked_projections[index])
 
     layers = _iter_layer_params(ref_data, prefix)
     for layer_idx, params in layers.items():
@@ -489,6 +506,11 @@ def load_diffusion_head_weights(module, ref_data: np.lib.npyio.NpzFile, prefix: 
     )
 
     # Transformer
+    module.transformer._build_blocks(
+        module.config.per_token_channels,
+        module.config.conditioning_seq_channel,
+        module.config.conditioning_pair_channel,
+    )
     _load_transformer(module.transformer, ref_data, f"{prefix}/transformer", "")
 
     # Output norm
@@ -604,14 +626,15 @@ def _relative_error(a: np.ndarray, b: np.ndarray, eps: float = 1e-8) -> float:
     return float(np.max(np.abs(a - b) / (np.abs(b) + eps)))
 
 
-class TestEndToEndJAXParity:
-    """end-to-end RMSD parity vs JAX AF3 outputs."""
+class TestSyntheticEndToEndJAXSmoke:
+    """Numerical smoke comparison using a synthetic JAX AF3 fixture."""
 
     def test_end_to_end_rmsd_and_confidence(self):
         if not REF_PATH.exists():
             pytest.skip(f"Missing reference file: {REF_PATH}")
 
         ref_data = np.load(REF_PATH)
+        _assert_synthetic_fixture_scope(ref_data)
 
         # Build parity Batch from reference dict
         batch_keys = [
@@ -733,6 +756,7 @@ class TestEndToEndJAXParity:
                 seq_channel=seq_channel,
                 pair_channel=pair_channel,
                 num_attention_heads=num_heads,
+                single_attention_heads=num_heads,
                 attention_key_dim=None,
                 intermediate_factor=4,
                 with_single=True,
@@ -866,7 +890,9 @@ class TestEndToEndJAXParity:
             pytest.skip("No valid backbone atoms for RMSD comparison")
 
         rmsd = _compute_backbone_rmsd(pred_bb, ref_bb, mask_bb)
-        assert rmsd < RMSD_TOL, f"FAILED: RMSD{rmsd:.4f}Å exceeds {RMSD_TOL:.2f}Å"
+        assert rmsd < RMSD_TOL, (
+            f"Synthetic smoke RMSD {rmsd:.4f}Å exceeds {RMSD_TOL:.2f}Å"
+        )
 
         # Confidence comparisons
         plddt_mlx = np.array(confidence.plddt)
@@ -893,5 +919,5 @@ class TestEndToEndJAXParity:
             ptm_rel_err = abs(ptm_mlx - ptm_jax) / (abs(ptm_jax) + 1e-8)
             assert ptm_rel_err < CONF_REL_TOL, f"pTM relative error too high: {ptm_rel_err:.4f}"
 
-        print("\n=== End-to-End JAX Parity PASSED ===")
+        print("\n=== Synthetic End-to-End JAX Smoke PASSED ===")
         print(f"  RMSD (backbone): {rmsd:.4f} Å")
