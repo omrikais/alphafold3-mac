@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 
@@ -89,6 +90,69 @@ class TestPTMOrdering:
         # Verify rank 1 has highest ipTM
         assert ranking.best_index == 1
         assert ranking.best_score == 0.92
+
+    def test_official_ranking_score_can_promote_disordered_complex(self) -> None:
+        """Official AF3 ranking includes pTM and disorder, not raw ipTM only."""
+        from alphafold3_mlx.pipeline.ranking import rank_samples
+
+        ranking = rank_samples(
+            ptm_scores=[0.7891, 0.7817],
+            iptm_scores=[0.7843, 0.7743],
+            plddt_scores=[[90.8], [90.2]],
+            is_complex=True,
+            fraction_disordered_scores=[0.5686, 0.5882],
+            has_clash_scores=[False, False],
+        )
+
+        assert ranking.ranking_metric == "ranking_score"
+        assert ranking.ranked_indices == [1, 0]
+        assert ranking.best_index == 1
+        assert ranking.best_score == pytest.approx(
+            0.8 * 0.7743 + 0.2 * 0.7817 + 0.5 * 0.5882
+        )
+
+    def test_structure_quality_metrics_detect_interchain_clash(self) -> None:
+        """Ranking quality metrics are computed from the predicted structure."""
+        from alphafold3_mlx.pipeline.ranking import (
+            compute_structure_quality_metrics,
+        )
+
+        atom_names = np.array([["N", "CA", "C", "O"], ["N", "CA", "C", "O"]])
+        element_symbols = np.array([["N", "C", "C", "O"], ["N", "C", "C", "O"]])
+        chain_a = np.array(
+            [[0.0, 0.0, 0.0], [1.4, 0.0, 0.0], [2.8, 0.0, 0.0], [3.8, 0.0, 0.0]]
+        )
+        positions = np.stack([chain_a, chain_a + 0.1], axis=0)[None, ...]
+
+        fractions, clashes = compute_structure_quality_metrics(
+            atom_positions=positions,
+            atom_mask=np.ones((1, 2, 4), dtype=bool),
+            atom_names=atom_names,
+            element_symbols=element_symbols,
+            comp_ids=np.array(["GLY", "GLY"]),
+            chain_ids=np.array(["A", "B"]),
+            residue_indices=np.array([1, 1]),
+            chain_types=np.array(["polypeptide(L)", "polypeptide(L)"]),
+        )
+
+        assert len(fractions) == 1
+        assert 0.0 <= fractions[0] <= 1.0
+        assert clashes == [True]
+
+    def test_official_ranking_score_penalizes_clashes(self) -> None:
+        """A clashing sample cannot win solely from high confidence scores."""
+        from alphafold3_mlx.pipeline.ranking import rank_samples
+
+        ranking = rank_samples(
+            ptm_scores=[0.99, 0.70],
+            iptm_scores=[0.99, 0.70],
+            plddt_scores=[[99.0], [70.0]],
+            is_complex=True,
+            fraction_disordered_scores=[1.0, 0.0],
+            has_clash_scores=[True, False],
+        )
+
+        assert ranking.ranked_indices == [1, 0]
 
     def test_ranking_preserves_all_samples(self) -> None:
         """Verify all samples are included in ranking."""

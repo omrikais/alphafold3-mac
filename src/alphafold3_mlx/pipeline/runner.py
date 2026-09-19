@@ -211,7 +211,7 @@ class InferenceRunner:
 
             # Rank samples (not a timed stage per spec)
             is_complex = auto_detect_complex(self.input_json.chain_ids)
-            ranking = self._rank_samples(result, is_complex)
+            ranking = self._rank_samples(result, is_complex, batch)
 
             # Write outputs - timing.json stage: output_writing
             self.progress.on_stage_start("output_writing")
@@ -666,7 +666,9 @@ class InferenceRunner:
 
         return guidance_fn
 
-    def _rank_samples(self, result: Any, is_complex: bool) -> "SampleRanking":
+    def _rank_samples(
+        self, result: Any, is_complex: bool, batch: Any
+    ) -> "SampleRanking":
         """Rank samples by confidence.
 
         Args:
@@ -677,7 +679,14 @@ class InferenceRunner:
             SampleRanking with ranked indices.
         """
         import numpy as np
-        from alphafold3_mlx.pipeline.ranking import rank_samples
+        from alphafold3.constants import mmcif_names
+        from alphafold3_mlx.pipeline.output_handler import (
+            build_structure_atom_metadata,
+        )
+        from alphafold3_mlx.pipeline.ranking import (
+            compute_structure_quality_metrics,
+            rank_samples,
+        )
 
         np_result = result.to_numpy()
 
@@ -711,7 +720,59 @@ class InferenceRunner:
             residue_mean_plddt = residue_mean_plddt[residue_mask]
             plddt_scores.append(residue_mean_plddt.tolist())
 
-        return rank_samples(ptm_scores, iptm_scores, plddt_scores, is_complex)
+        token_mask = np.asarray(batch.token_features.mask).reshape(-1) > 0
+        atom_metadata = build_structure_atom_metadata(
+            batch, self.input_json.input.chains
+        )
+        required_metadata = {
+            "atom_names", "element_symbols", "comp_ids", "chain_ids", "is_ligand",
+        }
+        missing_metadata = required_metadata.difference(atom_metadata)
+        if missing_metadata:
+            raise ValueError(
+                "Cannot compute official AF3 ranking without structure metadata: "
+                + ", ".join(sorted(missing_metadata))
+            )
+
+        comp_ids = np.asarray(atom_metadata["comp_ids"])[token_mask]
+        chain_ids = np.asarray(atom_metadata["chain_ids"])[token_mask]
+        is_ligand = np.asarray(atom_metadata["is_ligand"], dtype=bool)[token_mask]
+        chain_types = np.empty(comp_ids.shape, dtype=object)
+        for chain_id in dict.fromkeys(chain_ids.tolist()):
+            chain_mask = chain_ids == chain_id
+            if np.all(is_ligand[chain_mask]):
+                chain_type = mmcif_names.NON_POLYMER_CHAIN
+            else:
+                chain_type = mmcif_names.guess_polymer_type(
+                    comp_ids[chain_mask].tolist()
+                )
+            chain_types[chain_mask] = chain_type
+
+        fraction_disordered_scores, has_clash_scores = (
+            compute_structure_quality_metrics(
+                atom_positions=np_result["atom_positions"][:, token_mask],
+                atom_mask=np_result["atom_mask"][:, token_mask],
+                atom_names=np.asarray(atom_metadata["atom_names"])[token_mask],
+                element_symbols=np.asarray(atom_metadata["element_symbols"])[
+                    token_mask
+                ],
+                comp_ids=comp_ids,
+                chain_ids=chain_ids,
+                residue_indices=np.asarray(batch.token_features.residue_index)[
+                    token_mask
+                ],
+                chain_types=chain_types,
+            )
+        )
+
+        return rank_samples(
+            ptm_scores,
+            iptm_scores,
+            plddt_scores,
+            is_complex,
+            fraction_disordered_scores=fraction_disordered_scores,
+            has_clash_scores=has_clash_scores,
+        )
 
     def _write_outputs(
         self,

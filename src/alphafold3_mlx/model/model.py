@@ -36,7 +36,7 @@ from alphafold3_mlx.network.evoformer import Evoformer
 from alphafold3_mlx.network.diffusion_head import DiffusionHead
 from alphafold3_mlx.network.confidence_head import ConfidenceHead
 from alphafold3_mlx.network.atom_cross_attention import AtomCrossAttEncoder
-from alphafold3_mlx.jax_rng import haiku_next_rng_keys
+from alphafold3_mlx.jax_rng import official_af3_model_and_diffusion_keys
 from alphafold3_mlx.model.recycling import run_recycling_loop
 
 if TYPE_CHECKING:
@@ -363,7 +363,15 @@ class Model(nn.Module):
         # Canonical run_alphafold obtains the trunk model key through the
         # first Haiku next_rng_key() call. This key drives per-recycle MSA
         # sampling and must match JAX exactly.
-        model_key = haiku_next_rng_keys(key, 1)[0]
+        model_key, official_diffusion_key = official_af3_model_and_diffusion_keys(
+            key, num_recycles=self.config.num_recycles
+        )
+        if guidance_fn is None:
+            diffusion_key = mx.array(official_diffusion_key)
+        else:
+            # Restraint guidance is an MLX-only extension with a separately
+            # calibrated stochastic stream.
+            _, diffusion_key = mx.random.split(key)
 
         # Extract features
         token_features = batch.token_features
@@ -593,10 +601,7 @@ class Model(nn.Module):
         atom37_mask = atom37_mask * seq_mask[:, :, None]  # [batch, residues, 37]
 
         # Generate coordinates via diffusion (directly in atom37 format).
-        # Keep the calibrated MLX diffusion stream for product stability.
-        # Switching this custom restrained sampler to the JAX random stream
-        # regresses K48 interface recovery despite identical trunk outputs.
-        _, diffusion_key = mx.random.split(key)
+        # Use the post-trunk Haiku key position from the official AF3 schedule.
 
         # Build a minimal diffusion batch from FeatureBatch inputs.
         from alphafold3_mlx.atom_layout import GatherInfo

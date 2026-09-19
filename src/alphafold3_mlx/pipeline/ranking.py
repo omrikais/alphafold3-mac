@@ -13,6 +13,75 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 
+_IPTM_WEIGHT = 0.8
+_FRACTION_DISORDERED_WEIGHT = 0.5
+_CLASH_PENALTY = 100.0
+
+
+def compute_structure_quality_metrics(
+    *,
+    atom_positions: Any,
+    atom_mask: Any,
+    atom_names: Any,
+    element_symbols: Any,
+    comp_ids: Any,
+    chain_ids: Any,
+    residue_indices: Any,
+    chain_types: Any,
+) -> tuple[list[float], list[bool]]:
+    """Compute the structure-dependent terms in the official AF3 ranking."""
+    import numpy as np
+
+    from alphafold3 import structure
+    from alphafold3.model import confidences
+
+    positions = np.asarray(atom_positions)
+    masks = np.asarray(atom_mask, dtype=bool)
+    names = np.asarray(atom_names, dtype=object)
+    elements = np.asarray(element_symbols, dtype=object)
+    residues = np.asarray(comp_ids, dtype=object)
+    chains = np.asarray(chain_ids, dtype=object)
+    residue_ids = np.asarray(residue_indices, dtype=np.int32)
+    types = np.asarray(chain_types, dtype=object)
+
+    if positions.ndim != 4 or positions.shape[-1] != 3:
+        raise ValueError("atom_positions must have shape [samples, residues, atoms, 3]")
+    if masks.shape != positions.shape[:-1]:
+        raise ValueError("atom_mask must match atom_positions sample/residue/atom axes")
+    if names.shape != positions.shape[1:3] or elements.shape != names.shape:
+        raise ValueError("atom metadata must match the residue/atom layout")
+    for values, field_name in (
+        (residues, "comp_ids"),
+        (chains, "chain_ids"),
+        (residue_ids, "residue_indices"),
+        (types, "chain_types"),
+    ):
+        if values.shape != (positions.shape[1],):
+            raise ValueError(f"{field_name} must match the residue axis")
+
+    fraction_disordered_scores = []
+    has_clash_scores = []
+    for sample_positions, sample_mask in zip(positions, masks, strict=True):
+        predicted_structure = structure.from_res_arrays(
+            atom_mask=sample_mask,
+            atom_x=sample_positions[..., 0],
+            atom_y=sample_positions[..., 1],
+            atom_z=sample_positions[..., 2],
+            atom_name=names,
+            atom_element=elements,
+            chain_id=chains,
+            chain_type=types,
+            res_id=residue_ids,
+            res_name=residues,
+        )
+        fraction_disordered_scores.append(
+            float(confidences.fraction_disordered(predicted_structure))
+        )
+        has_clash_scores.append(bool(confidences.has_clash(predicted_structure)))
+
+    return fraction_disordered_scores, has_clash_scores
+
+
 @dataclass
 class RankingScores:
     """Confidence scores for a single sample.
@@ -28,6 +97,9 @@ class RankingScores:
     iptm: float
     mean_plddt: float
     plddt_variance: float = 0.0
+    fraction_disordered: float = 0.0
+    has_clash: bool = False
+    ranking_score: float | None = None
 
     def to_dict(self) -> dict[str, float]:
         """Convert to JSON-serializable dict."""
@@ -36,6 +108,9 @@ class RankingScores:
             "iptm": self.iptm,
             "mean_plddt": self.mean_plddt,
             "plddt_variance": self.plddt_variance,
+            "fraction_disordered": self.fraction_disordered,
+            "has_clash": self.has_clash,
+            "ranking_score": self.ranking_score,
         }
 
 
@@ -52,7 +127,7 @@ class SampleRanking:
 
     ranked_indices: list[int]
     scores: dict[int, RankingScores]
-    ranking_metric: Literal["pTM", "ipTM"]
+    ranking_metric: Literal["pTM", "ipTM", "ranking_score"]
     is_complex: bool
 
     @property
@@ -63,6 +138,11 @@ class SampleRanking:
     @property
     def best_score(self) -> float:
         """Score of the best-ranked sample."""
+        if self.ranking_metric == "ranking_score":
+            score = self.scores[self.best_index].ranking_score
+            if score is None:
+                raise ValueError("ranking_score metric selected without scores")
+            return score
         metric_name = "ptm" if self.ranking_metric == "pTM" else "iptm"
         return getattr(self.scores[self.best_index], metric_name)
 
@@ -86,6 +166,9 @@ class SampleRanking:
                 "ptm": score.ptm,
                 "iptm": score.iptm,
                 "mean_plddt": score.mean_plddt,
+                "ranking_score": score.ranking_score,
+                "fraction_disordered": score.fraction_disordered,
+                "has_clash": score.has_clash,
             })
 
         aggregate = compute_aggregate_metrics(self)
@@ -104,6 +187,8 @@ def rank_samples(
     iptm_scores: list[float],
     plddt_scores: list[list[float]],
     is_complex: bool,
+    fraction_disordered_scores: list[float] | None = None,
+    has_clash_scores: list[bool] | None = None,
 ) -> SampleRanking:
     """Rank samples by confidence metric.
 
@@ -121,9 +206,33 @@ def rank_samples(
     """
     num_samples = len(ptm_scores)
 
-    # Choose ranking metric
-    if is_complex:
-        ranking_metric: Literal["pTM", "ipTM"] = "ipTM"
+    use_official_score = (
+        fraction_disordered_scores is not None or has_clash_scores is not None
+    )
+    if fraction_disordered_scores is None:
+        fraction_disordered_scores = [0.0] * num_samples
+    if has_clash_scores is None:
+        has_clash_scores = [False] * num_samples
+    if len(fraction_disordered_scores) != num_samples:
+        raise ValueError("fraction_disordered_scores must match sample count")
+    if len(has_clash_scores) != num_samples:
+        raise ValueError("has_clash_scores must match sample count")
+
+    if use_official_score:
+        ranking_metric: Literal["pTM", "ipTM", "ranking_score"] = "ranking_score"
+        metric_values = [
+            (
+                _IPTM_WEIGHT * iptm_scores[i]
+                + (1.0 - _IPTM_WEIGHT) * ptm_scores[i]
+                if is_complex
+                else ptm_scores[i]
+            )
+            + _FRACTION_DISORDERED_WEIGHT * fraction_disordered_scores[i]
+            - _CLASH_PENALTY * has_clash_scores[i]
+            for i in range(num_samples)
+        ]
+    elif is_complex:
+        ranking_metric = "ipTM"
         metric_values = iptm_scores
     else:
         ranking_metric = "pTM"
@@ -153,6 +262,9 @@ def rank_samples(
             iptm=iptm_scores[i],
             mean_plddt=mean_plddt,
             plddt_variance=variance,
+            fraction_disordered=fraction_disordered_scores[i],
+            has_clash=has_clash_scores[i],
+            ranking_score=metric_values[i] if use_official_score else None,
         )
 
     return SampleRanking(
